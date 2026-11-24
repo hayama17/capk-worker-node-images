@@ -1,0 +1,15 @@
+{
+  "build_name": "ubuntu-2604-minimal",
+  "cd_files": "./packer/qemu/cloud-init/*",
+  "disk_image": "true",
+  "distribution_version": "2604",
+  "distro_name": "ubuntu",
+  "extra_debs": "qemu-guest-agent",
+  "guest_os_type": "ubuntu-64",
+  "iso_checksum": "https://cloud-images.ubuntu.com/minimal/releases/resolute/release/SHA256SUMS",
+  "iso_checksum_type": "file",
+  "iso_url": "https://cloud-images.ubuntu.com/minimal/releases/resolute/release/ubuntu-26.04-minimal-cloudimg-amd64.img",
+  "memory": "4096",
+  "os_display_name": "Ubuntu 26.04",
+  "shutdown_command": "shutdown -P now"
+}

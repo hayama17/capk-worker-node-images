@@ -1,0 +1,61 @@
+name: build
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Kubernetes version (e.g. v1.37.2)
+        required: true
+      publish:
+        description: Push to GHCR
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  packages: write
+concurrency: build-${{ inputs.version }}
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      VERSION: ${{ inputs.version }}
+      IMAGE: ghcr.io/${{ github.repository }}/ubuntu-2604-minimal
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: kubernetes-sigs/image-builder
+          ref: b90539cc0e4847de2e03e16f943ab457708c00b7 # v0.1.55
+          path: image-builder
+          persist-credentials: false
+      # image-builder prints its environment while building, so the token is only passed to the steps that need it.
+      - name: Refuse to overwrite a published tag
+        if: inputs.publish
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          if docker manifest inspect "$IMAGE:$VERSION" >/dev/null 2>&1; then
+            echo "::error::$IMAGE:$VERSION already exists"; exit 1
+          fi
+          docker logout ghcr.io
+      - name: Build
+        run: ./build.sh
+      - name: Boot the image and run a cluster on it
+        run: ./smoke.sh
+      - name: Push
+        if: inputs.publish
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker tag ubuntu-2604-minimal-container-disk "$IMAGE:$VERSION"
+          docker push "$IMAGE:$VERSION"
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: serial-log
+          path: serial.log
+          if-no-files-found: ignore
