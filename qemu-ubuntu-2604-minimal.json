@@ -4,7 +4,7 @@
   "disk_image": "true",
   "distribution_version": "2604",
   "distro_name": "ubuntu",
-  "extra_debs": "qemu-guest-agent",
+  "extra_debs": "qemu-guest-agent networkd-dispatcher bash-completion iptables",
   "guest_os_type": "ubuntu-64",
   "iso_checksum": "https://cloud-images.ubuntu.com/minimal/releases/resolute/release/SHA256SUMS",
   "iso_checksum_type": "file",
