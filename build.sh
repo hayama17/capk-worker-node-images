@@ -29,8 +29,20 @@ cd image-builder/images/capi
 export PATH="$HOME/.local/bin:$PATH"
 export QEMU_BUILD_NAMES=qemu-$OS
 export PACKER_FLAGS="--var kubernetes_semver=$VERSION --var kubernetes_series=$series --var kubernetes_deb_version=$deb --var iso_checksum=$sha --var containerd_version=${CONTAINERD_VERSION#v} --var runc_version=${RUNC_VERSION#v} --var crictl_version=${CRICTL_VERSION#v}"
-# Packer looks up plugins anonymously, which shared runners often exhaust
-make deps-qemu || { sleep 300; make deps-qemu; }
+# packer init has no pinned hash, and its anonymous API calls often exceed the limit of shared runners
+plugin() {
+  local dir=$HOME/.config/packer/plugins/github.com/${1,,} file=packer-plugin-${1#*/}_$2_x5.0_linux_amd64
+  mkdir -p "$dir"
+  curl -fsSL -o "$dir/$file.zip" "https://github.com/${1%/*}/packer-plugin-${1#*/}/releases/download/$2/$file.zip"
+  echo "$3  $dir/$file.zip" | sha256sum -c -
+  unzip -q -o "$dir/$file.zip" "$file" -d "$dir"
+  sha256sum "$dir/$file" | cut -d' ' -f1 > "$dir/${file}_SHA256SUM"
+  rm "$dir/$file.zip"
+}
+plugin hashicorp/ansible "$PACKER_ANSIBLE_VERSION" "$PACKER_ANSIBLE_SHA256"
+plugin hashicorp/qemu "$PACKER_QEMU_VERSION" "$PACKER_QEMU_SHA256"
+plugin YaleUniversity/goss "$PACKER_GOSS_VERSION" "$PACKER_GOSS_SHA256"
+make deps-qemu
 make "build-kubevirt-qemu-$OS"
 ls -lh output/*/
 docker image ls

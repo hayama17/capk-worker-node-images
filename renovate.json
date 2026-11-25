@@ -36,20 +36,6 @@
     },
     {
       "customType": "regex",
-      "description": "Packer plugins",
-      "managerFilePatterns": [
-        "/^image-builder\\.patch$/"
-      ],
-      "matchStrings": [
-        "\\+ +version = \"(?<currentValue>[^\"]+)\"\\n +source += +\"github\\.com/(?<depName>[^\"]+)\"",
-        "source += +\"github\\.com/(?<depName>[^\"]+)\"\\n-.*\\n\\+ +version = \"(?<currentValue>[^\"]+)\""
-      ],
-      "datasourceTemplate": "github-releases",
-      "packageNameTemplate": "{{{replace '/' '/packer-plugin-' depName}}}",
-      "extractVersionTemplate": "^v(?<version>.+)$"
-    },
-    {
-      "customType": "regex",
       "description": "Manifests used by the smoke test",
       "managerFilePatterns": [
         "/^smoke\\.sh$/"
@@ -74,6 +60,13 @@
         "opencontainers/runc"
       ],
       "allowedVersions": "/^v1\\.4\\./"
+    },
+    {
+      "description": "image-builder requires ~> 1.1.0",
+      "matchDepNames": [
+        "hashicorp/packer-plugin-qemu"
+      ],
+      "allowedVersions": "/^v1\\.1\\./"
     }
   ]
 }

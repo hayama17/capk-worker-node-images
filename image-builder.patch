@@ -83,24 +83,6 @@ index f767f68..c5c5d4e 100755
    'ansible.posix' \
    'ansible.windows:>=1.7.0' \
    community.windows
-diff --git a/images/capi/packer/config.pkr.hcl b/images/capi/packer/config.pkr.hcl
-index 2c5e1f2..4b2a3be 100644
---- a/images/capi/packer/config.pkr.hcl
-+++ b/images/capi/packer/config.pkr.hcl
-@@ -1,11 +1,11 @@
- packer {
-   required_plugins {
-     ansible = {
--      version = ">= 1.1.0"
-+      version = "1.1.3"
-       source  = "github.com/hashicorp/ansible"
-     }
-     goss = {
--      version = ">= 3.2.14"
-+      version = "3.2.14"
-       source  = "github.com/YaleUniversity/goss"
-     }
-   }
 diff --git a/images/capi/packer/goss/goss-command.yaml b/images/capi/packer/goss/goss-command.yaml
 index d82a964..b434306 100644
 --- a/images/capi/packer/goss/goss-command.yaml
@@ -123,19 +105,6 @@ index d82a964..b434306 100644
  {{end}}
  {{if eq .Vars.kubernetes_source_type "http"}}
    kubectl version --client -o json | jq .clientVersion.gitVersion | tr -d '"' | awk '{print substr($1,2); }':
-diff --git a/images/capi/packer/qemu/config.pkr.hcl b/images/capi/packer/qemu/config.pkr.hcl
-index 5fd19df..578b484 100644
---- a/images/capi/packer/qemu/config.pkr.hcl
-+++ b/images/capi/packer/qemu/config.pkr.hcl
-@@ -2,7 +2,7 @@ packer {
-   required_plugins {
-     qemu = {
-       source =  "github.com/hashicorp/qemu"
--      version = "~> 1.1.0"
-+      version = "1.1.3"
-     }
-   }
- }
 diff --git a/images/capi/packer/qemu/scripts/build_kubevirt_image.sh b/images/capi/packer/qemu/scripts/build_kubevirt_image.sh
 index 1fb0277..b97d213 100644
 --- a/images/capi/packer/qemu/scripts/build_kubevirt_image.sh
