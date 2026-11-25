@@ -27,11 +27,13 @@ loop=$(sudo losetup -Pfr --show "$dir/disk.raw")
 trap 'sudo umount "$dir/root" || true; sudo losetup -d "$loop"' EXIT
 sudo mount -o ro,noload "${loop}p1" "$dir/root"
 
-# GitHub rejects attestations over 16 MB, so leave out the file list.
 sudo SYFT_FILE_METADATA_SELECTION=none "$dir/syft" scan "dir:$dir/root" --base-path "$dir/root" \
   --source-name "${1%%[:@]*}" --source-version "$VERSION" \
   -o spdx-json=sbom.spdx.json -o syft-json=sbom.syft.json
 sudo chown "$(id -u)" sbom.*.json
+# GitHub rejects attestations over 16 MB, and the file entries alone take most of that.
+jq -c 'del(.files) | .relationships |= map(select(.spdxElementId + .relatedSpdxElement | contains("SPDXRef-File-") | not))' sbom.spdx.json > "$dir/spdx.json"
+mv "$dir/spdx.json" sbom.spdx.json
 ls -lh sbom.*.json
 jq -e --arg v "${VERSION#v}" 'any(.packages[]; .name == "kubelet" and (.versionInfo // "" | startswith($v + "-")))' sbom.spdx.json
 
