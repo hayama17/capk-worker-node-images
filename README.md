@@ -19,7 +19,7 @@ ghcr.io/hayama17/capk-worker-node-images/ubuntu-2404-minimal:<kubernetes version
 
 [Published versions](https://github.com/hayama17/capk-worker-node-images/pkgs/container/capk-worker-node-images%2Fubuntu-2404-minimal). Pulling needs no login.
 
-`<version>` moves to the newest build of that Kubernetes version. `<version>-<build>` never moves, so use it to pin or roll back. There is no `latest`, because a worker has to match the version of its cluster. The [releases](https://github.com/hayama17/capk-worker-node-images/releases) list what each build contains.
+`<version>` moves to the newest build of that Kubernetes version. `<version>-<build>` never moves. There is no `latest`, because a worker has to match the version of its cluster. The [releases](https://github.com/hayama17/capk-worker-node-images/releases) list what each build contains.
 
 ## What makes it small
 
@@ -36,15 +36,18 @@ The price:
 
 ## Use
 
-Point the `KubevirtMachineTemplate` of your workers at the tag that matches the Kubernetes version of the cluster:
+Point the `KubevirtMachineTemplate` of your workers at a build of the Kubernetes version of the cluster, and roll out a new template to update:
 
 ```yaml
 volumes:
   - name: containervolume
     containerDisk:
-      image: ghcr.io/hayama17/capk-worker-node-images/ubuntu-2404-minimal:v1.37.2
-      imagePullPolicy: Always # pick up rebuilds of the same tag
+      image: ghcr.io/hayama17/capk-worker-node-images/ubuntu-2404-minimal:v1.37.2-<build>
 ```
+
+A template that pins a retired build can no longer create machines, so move to a newer build in time or mirror the image. See [Retention](#retention).
+
+`v1.37.2` without a build number is for trying things out, and for setups that derive the tag from the cluster version. With `imagePullPolicy: Always` it picks up rebuilds, but then machines of one template differ by when they were created.
 
 ## What is inside
 
@@ -57,7 +60,7 @@ volumes:
 
 Nothing is pushed before it passes [`smoke.sh`](smoke.sh). It boots the disk the way CAPK does, with q35 and a virtio config drive. The script then checks kubeadm, Flannel, CoreDNS, the guest agent, and signals inside a container.
 
-It does not run Kamaji, CAPK, Cilium or storage drivers.
+It runs `kubeadm init`, which is not how workers start. `kubeadm join` against an external API server is not tested yet ([#8](https://github.com/hayama17/capk-worker-node-images/issues/8)), and neither are Kamaji, CAPK, Cilium and storage drivers.
 
 ## Retention
 
@@ -79,7 +82,7 @@ Fork the repository, enable Actions, list the versions you want in [`build.yml`]
 gh workflow run build.yml -R <you>/capk-worker-node-images
 ```
 
-[`build.sh`](build.sh) drives a pinned [image-builder](https://github.com/kubernetes-sigs/image-builder). `ubuntu-2604-minimal` can be built too, but it is not published because it fails the smoke test.
+[`build.sh`](build.sh) drives a pinned [image-builder](https://github.com/kubernetes-sigs/image-builder). `ubuntu-2604-minimal` can be built too, but it is not published because it fails the smoke test: AppArmor denies signals inside containers ([containerd/containerd#14485](https://github.com/containerd/containerd/issues/14485)), and profiles meant for the host also apply to processes in containers. [`roles/containerd_apparmor`](roles/containerd_apparmor) works around the first one only.
 
 ## Verify
 
