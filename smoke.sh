@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Boot two machines from the built disk the way CAPK does (q35, config drive on virtio, DHCP),
+# Boot two machines from the built disk the way CAPK does (q35, config drive on virtio),
 # run a control plane on one, and join the other to it as a worker.
 set -euo pipefail
 

@@ -58,9 +58,9 @@ A template that pins a retired build can no longer create machines, so move to a
 
 ## What is tested
 
-Nothing is pushed before it passes [`smoke.sh`](smoke.sh). It boots two machines from the disk the way CAPK does, with q35, a virtio config drive and DHCP. One runs a control plane of the same version, and the other joins it as a worker with `kubeadm join`, using a bootstrap token, an external endpoint and a pinned CA hash.
+Nothing is pushed before it passes [`smoke.sh`](smoke.sh). It boots two machines from the disk the way CAPK does, with q35 and a virtio config drive. One runs a control plane of the same version, and the other joins it as a worker with `kubeadm join`, using a bootstrap token, an external endpoint and a pinned CA hash.
 
-It then checks Flannel, CoreDNS across nodes, `kubectl logs` and `exec`, the guest agent, signals inside a container, that a wrong CA hash is refused, and that the worker pulled no control plane image.
+It then checks Flannel, CoreDNS, `kubectl logs` and `exec`, the guest agent, signals inside a container, that a wrong CA hash is refused, and that the worker pulled no control plane image.
 
 It does not run Kamaji, CAPK, Cilium or storage drivers.
 
