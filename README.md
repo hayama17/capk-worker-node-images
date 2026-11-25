@@ -60,9 +60,11 @@ A template that pins a retired build can no longer create machines, so move to a
 
 Nothing is pushed before it passes [`smoke.sh`](smoke.sh). It boots two machines from the disk the way CAPK does, with q35 and a virtio config drive. One runs a control plane of the same version, and the other joins it as a worker with `kubeadm join`, using a bootstrap token, an external endpoint and a pinned CA hash.
 
-It then checks Flannel, CoreDNS, `kubectl logs` and `exec`, the guest agent, signals inside a container, that a wrong CA hash is refused, and that the worker pulled no control plane image.
+That runs twice, with Flannel and with Cilium instead of kube-proxy. It checks CoreDNS, `kubectl logs` and `exec`, the guest agent, signals inside a container, that a wrong CA hash is refused, and that the worker pulled no control plane image.
 
-It does not run Kamaji, CAPK, Cilium or storage drivers.
+With Cilium it also checks that a `NetworkPolicy` is enforced.
+
+It does not run Kamaji, CAPK or storage drivers.
 
 ## Retention
 

@@ -38,7 +38,7 @@ jobs:
       - name: Build
         run: ./build.sh
       - name: Boot the image and run a cluster on it
-        run: ./smoke.sh
+        run: CNI=flannel ./smoke.sh && CNI=cilium ./smoke.sh
       - name: SBOM
         run: ./sbom.sh
       - name: Label

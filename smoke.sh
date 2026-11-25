@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Boot two machines from the built disk the way CAPK does (q35, config drive on virtio),
-# run a control plane on one, and join the other to it as a worker.
+# run a control plane on one, and join the other to it as a worker. $CNI is flannel or cilium.
 set -euo pipefail
+. ./versions.env
 
 disk=image-builder/images/capi/output/$OS-kube-$VERSION/$OS-kube-$VERSION
 dir=$(mktemp -d)
@@ -12,6 +13,19 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=kubernetes -addext k
   -keyout "$dir/ca.key" -out "$dir/ca.crt" 2>/dev/null
 hash=sha256:$(openssl x509 -in "$dir/ca.crt" -noout -pubkey | openssl pkey -pubin -outform der | sha256sum | cut -d' ' -f1)
 token=$(openssl rand -hex 3).$(openssl rand -hex 8)
+
+# Cilium replaces kube-proxy, so it has to reach the API server by itself
+case $CNI in
+  flannel)
+    init_flags=
+    curl -fsSL -o "$dir/cni.yaml" "https://github.com/flannel-io/flannel/releases/download/$FLANNEL_VERSION/kube-flannel.yml" ;;
+  cilium)
+    init_flags=--skip-phases=addon/kube-proxy
+    helm template cilium cilium --repo https://helm.cilium.io --version "${CILIUM_VERSION#v}" -n kube-system \
+      --set kubeProxyReplacement=true,k8sServiceHost=$cp_ip,k8sServicePort=6443,ipam.mode=kubernetes,operator.replicas=1,hubble.enabled=false \
+      > "$dir/cni.yaml" ;;
+  *) echo "unknown CNI: $CNI" >&2; exit 1 ;;
+esac
 
 prologue() {
   cat <<GUEST
@@ -31,11 +45,23 @@ export KUBECONFIG=/etc/kubernetes/admin.conf
 mkdir -p /etc/kubernetes/pki
 base64 -d <<< "$(base64 -w0 "$dir/ca.crt")" > /etc/kubernetes/pki/ca.crt
 base64 -d <<< "$(base64 -w0 "$dir/ca.key")" > /etc/kubernetes/pki/ca.key
-kubeadm init --kubernetes-version $VERSION --pod-network-cidr 10.244.0.0/16 --token $token
-kubectl apply -f https://github.com/flannel-io/flannel/releases/download/v0.28.11/kube-flannel.yml
+kubeadm init --kubernetes-version $VERSION --pod-network-cidr 10.244.0.0/16 --token $token $init_flags
+base64 -d <<< "$(gzip -c "$dir/cni.yaml" | base64 -w0)" | gunzip | kubectl apply --server-side -f -
 until kubectl get node worker; do sleep 5; done
 kubectl wait --for=condition=Ready node --all --timeout=5m
 kubectl -n kube-system rollout status deploy/coredns --timeout=5m
+if [[ $CNI == cilium ]]; then
+  kubectl -n kube-system rollout status ds/cilium --timeout=5m
+  if kubectl -n kube-system get ds kube-proxy; then exit 1; fi
+  kubectl run web --image=registry.k8s.io/e2e-test-images/agnhost:2.39 --restart=Never -- netexec --http-port=8080
+  kubectl run client --image=registry.k8s.io/e2e-test-images/agnhost:2.39 --restart=Never -- pause
+  kubectl wait --for=condition=Ready pod/web pod/client --timeout=3m
+  web=\$(kubectl get pod web -o jsonpath='{.status.podIP}'):8080
+  kubectl exec client -- /agnhost connect \$web --timeout=5s
+  echo '{"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy", "metadata": {"name": "deny"}, "spec": {"podSelector": {"matchLabels": {"run": "web"}}}}' | kubectl apply -f -
+  sleep 10
+  if kubectl exec client -- /agnhost connect \$web --timeout=5s; then exit 1; fi
+fi
 # The worker is the only node without a taint. Not Docker Hub, which rate-limits shared runners
 kubectl run dns --image=registry.k8s.io/e2e-test-images/agnhost:2.39 --restart=Never --command -- sh -c 'sleep 60 & kill \$! && nslookup kubernetes.default.svc.cluster.local'
 kubectl run exec --image=registry.k8s.io/e2e-test-images/agnhost:2.39 --restart=Never -- pause
@@ -67,12 +93,18 @@ until crictl ps -a --name '^dns\$' --state Exited -q | grep .; do sleep 5; done
 crictl images
 if crictl images | grep -E '/(kube-(apiserver|controller-manager|scheduler)|etcd) '; then exit 1; fi
 # containerd/containerd#14485; auditd takes the denials away from the kernel log
-if denied | grep -E 'operation=.signal'; then exit 1; fi
+if denied | grep -E '$([[ $CNI == cilium ]] && echo DENIED || echo operation=.signal)'; then exit 1; fi
 trap - EXIT
 # Stay up, the control plane is still using this node
 echo SMOKE_RESULT=OK
 GUEST
 
+cleanup() {
+  sudo pkill qemu-system || true
+  sudo pkill dnsmasq || true
+  for i in smoke-cp smoke-worker smoke; do sudo ip link del "$i" 2>/dev/null || true; done
+}
+trap cleanup EXIT
 sudo apt-get install -y -q dnsmasq-base
 sudo ip link add smoke type bridge
 sudo ip addr add "$net.1/24" dev smoke
@@ -93,7 +125,7 @@ boot() { # name, last byte of the MAC
   sudo ip tuntap add "smoke-$1" mode tap user "$(id -un)"
   sudo ip link set "smoke-$1" master smoke up
   timeout 25m qemu-system-x86_64 -M q35 -accel kvm -cpu host -smp 2 -m 4096 -display none -no-reboot -snapshot -uuid "$(uuidgen)" \
-    -serial "file:serial-$1.log" \
+    -serial "file:serial-$CNI-$1.log" \
     -drive "file=$disk,if=virtio,format=qcow2" \
     -drive "file=$dir/$1.iso,if=virtio,format=raw,readonly=on" \
     -device pcie-root-port,id=rp1,slot=1 -netdev "tap,id=n0,ifname=smoke-$1,script=no,downscript=no" \
@@ -101,8 +133,8 @@ boot() { # name, last byte of the MAC
     -device virtio-serial -chardev null,id=ga -device virtserialport,chardev=ga,name=org.qemu.guest_agent.0
 }
 
-touch serial-cp.log serial-worker.log
-tail -f serial-cp.log serial-worker.log &
+touch "serial-$CNI"-{cp,worker}.log
+tail -f "serial-$CNI"-{cp,worker}.log &
 tail=$!
 boot cp 10 &
 cp=$!
@@ -110,10 +142,9 @@ boot worker 11 &
 # The worker only exits first when it fails
 wait -n "$cp" $! || true
 # Its last checks may still be running
-timeout 1m sh -c 'until grep -q SMOKE_RESULT serial-worker.log; do sleep 1; done' || true
+timeout 1m sh -c "until grep -q SMOKE_RESULT serial-$CNI-worker.log; do sleep 1; done" || true
 sleep 2
 kill "$tail"
-sudo pkill qemu-system || true
 
-grep -q 'SMOKE_RESULT=OK' serial-cp.log
-grep -q 'SMOKE_RESULT=OK' serial-worker.log
+grep -q 'SMOKE_RESULT=OK' "serial-$CNI-cp.log"
+grep -q 'SMOKE_RESULT=OK' "serial-$CNI-worker.log"
