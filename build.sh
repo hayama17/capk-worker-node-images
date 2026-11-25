@@ -20,7 +20,8 @@ export QEMU_BUILD_NAMES=qemu-ubuntu-2604-minimal
 export PACKER_FLAGS="--var kubernetes_semver=$VERSION --var kubernetes_series=$series --var kubernetes_deb_version=$deb"
 # kubeadm v1.37 no longer reads v1beta3
 sed -i s/v1beta3/v1beta4/ ansible/roles/kubernetes/templates/etc/kubeadm.yml
-make deps-qemu
+# Packer looks up plugins anonymously, which shared runners often exhaust
+make deps-qemu || { sleep 300; make deps-qemu; }
 make build-kubevirt-qemu-ubuntu-2604-minimal
 ls -lh output/*/
 docker image ls
