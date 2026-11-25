@@ -41,6 +41,7 @@ plugin() {
 plugin hashicorp/ansible "$PACKER_ANSIBLE_VERSION" "$PACKER_ANSIBLE_SHA256"
 plugin hashicorp/qemu "$PACKER_QEMU_VERSION" "$PACKER_QEMU_SHA256"
 plugin YaleUniversity/goss "$PACKER_GOSS_VERSION" "$PACKER_GOSS_SHA256"
-make deps-qemu
+# Galaxy sometimes answers with garbage, and ansible-galaxy caches it
+make deps-qemu || { rm -rf ~/.ansible/galaxy_cache; sleep 60; make deps-qemu; }
 make "build-kubevirt-qemu-$OS"
 ls -lh output/*/
