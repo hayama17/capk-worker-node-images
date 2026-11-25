@@ -7,9 +7,8 @@
     "before 9am on monday"
   ],
   "timezone": "Asia/Tokyo",
-  "automerge": false,
   "prBodyNotes": [
-    "Run the `build` workflow on this branch with `publish` off before merging."
+    "Run the `build` workflow on this branch before merging. It publishes only from `main`."
   ],
   "customManagers": [
     {
@@ -27,7 +26,7 @@
       "customType": "regex",
       "description": "image-builder",
       "managerFilePatterns": [
-        "/^\\.github/workflows/build\\.yml$/"
+        "/^\\.github/workflows/image\\.yml$/"
       ],
       "matchStrings": [
         "repository: (?<depName>kubernetes-sigs/image-builder)\\n\\s+ref: (?<currentDigest>[0-9a-f]{40}) # (?<currentValue>v\\S+)"
@@ -36,13 +35,14 @@
     },
     {
       "customType": "regex",
-      "description": "Manifests used by the smoke test",
+      "description": "Kubernetes versions to publish",
       "managerFilePatterns": [
-        "/^smoke\\.sh$/"
+        "/^\\.github/workflows/build\\.yml$/"
       ],
       "matchStrings": [
-        "https://github\\.com/(?<depName>[^/]+/[^/]+)/releases/download/(?<currentValue>v[^/]+)/"
+        "- (?<currentValue>v1\\.\\d+\\.\\d+)\\n"
       ],
+      "depNameTemplate": "kubernetes/kubernetes",
       "datasourceTemplate": "github-releases"
     }
   ],
@@ -67,6 +67,17 @@
         "hashicorp/packer-plugin-qemu"
       ],
       "allowedVersions": "/^v1\\.1\\./"
+    },
+    {
+      "description": "Add new Kubernetes minors by hand",
+      "matchDepNames": [
+        "kubernetes/kubernetes"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor"
+      ],
+      "enabled": false
     }
   ]
 }

@@ -4,10 +4,9 @@ set -euo pipefail
 set -a; . ./versions.env; set +a
 
 [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "invalid version: $VERSION" >&2; exit 1; }
-semver=${VERSION#v}
 series=${VERSION%.*}
 deb=$(curl -fsSL "https://pkgs.k8s.io/core:/stable:/$series/deb/Packages" |
-  awk -v v="$semver" '/^Package: /{p=$2} /^Version: /{if (p=="kubelet" && index($2, v "-")==1) d=$2} END{print d}')
+  awk -v v="${VERSION#v}" '/^Package: /{p=$2} /^Version: /{if (p=="kubelet" && index($2, v "-")==1) d=$2} END{print d}')
 [[ -n "$deb" ]] || { echo "no kubelet package for $VERSION" >&2; exit 1; }
 
 sudo apt-get update -q
@@ -42,7 +41,7 @@ plugin() {
 plugin hashicorp/ansible "$PACKER_ANSIBLE_VERSION" "$PACKER_ANSIBLE_SHA256"
 plugin hashicorp/qemu "$PACKER_QEMU_VERSION" "$PACKER_QEMU_SHA256"
 plugin YaleUniversity/goss "$PACKER_GOSS_VERSION" "$PACKER_GOSS_SHA256"
-make deps-qemu
+# Galaxy sometimes answers with garbage, and ansible-galaxy caches it
+make deps-qemu || { rm -rf ~/.ansible/galaxy_cache; sleep 60; make deps-qemu; }
 make "build-kubevirt-qemu-$OS"
 ls -lh output/*/
-docker image ls

@@ -61,22 +61,27 @@ It does not run Kamaji, CAPK, Cilium or storage drivers.
 
 ## Build your own
 
-Fork the repository, enable Actions, and run the [`build`](.github/workflows/build.yml) workflow. Set `publish` to push to the GHCR of the fork.
+Fork the repository, enable Actions, list the versions you want in [`build.yml`](.github/workflows/build.yml), and run it. It publishes to the GHCR of the fork from `main`, and only builds and tests from other branches.
 
 ```bash
-gh workflow run build.yml -R <you>/capk-worker-node-images -f version=v1.37.2 -f publish=true
+gh workflow run build.yml -R <you>/capk-worker-node-images
 ```
 
 [`build.sh`](build.sh) drives a pinned [image-builder](https://github.com/kubernetes-sigs/image-builder). `ubuntu-2604-minimal` can be built too, but it is not published because it fails the smoke test.
 
 ## Verify
 
-New builds carry a build provenance and an SPDX SBOM of the disk. Older ones may not.
+Images carry build provenance and an SPDX SBOM of the disk. The build is designed for [SLSA v1.0 Build Level 3](https://slsa.dev/spec/v1.0/levels#build-l3) (self-assessed): it runs in a reusable workflow without inputs on GitHub-hosted runners, and the build steps cannot reach the signing token.
 
 ```bash
-image=oci://ghcr.io/hayama17/capk-worker-node-images/ubuntu-2404-minimal:v1.37.2
-gh attestation verify "$image" --repo hayama17/capk-worker-node-images
-gh attestation verify "$image" --repo hayama17/capk-worker-node-images --predicate-type https://spdx.dev/Document/v2.3
+verify() {
+  gh attestation verify oci://ghcr.io/hayama17/capk-worker-node-images/ubuntu-2404-minimal:v1.37.2 \
+    --repo hayama17/capk-worker-node-images \
+    --signer-workflow hayama17/capk-worker-node-images/.github/workflows/image.yml \
+    --source-ref refs/heads/main --deny-self-hosted-runners "$@"
+}
+verify
+verify --predicate-type https://spdx.dev/Document/v2.3
 ```
 
 ## License
