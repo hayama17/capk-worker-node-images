@@ -37,6 +37,6 @@ mv "$dir/spdx.json" sbom.spdx.json
 ls -lh sbom.*.json
 jq -e --arg v "${VERSION#v}" 'any(.packages[]; .name == "kubelet" and (.versionInfo // "" | startswith($v + "-")))' sbom.spdx.json
 
-# No --fail-on: the images still carry control plane images that workers never run.
+# No --fail-on: most matches have no fix upstream yet.
 "$dir/grype" sbom:sbom.syft.json -o json=grype.json -o table=grype.txt
 jq -r '.matches | group_by(.vulnerability.severity)[] | "\(.[0].vulnerability.severity): \(length)"' grype.json
