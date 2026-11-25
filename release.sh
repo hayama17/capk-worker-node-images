@@ -14,7 +14,7 @@ set -euo pipefail
 for dir in results/*/; do
   name=$(basename "$dir") name=${name#results-}
   base=$(jq -r '.iso_url | capture("/release-(?<d>[0-9.]+)/").d' "qemu-${name%-v*}.json")
-  kernel=$(grep -oE '[0-9]+\.[0-9.]+-[0-9]+-generic' "$dir/serial-worker.log" | tail -1)
+  kernel=$(grep -oE '[0-9]+\.[0-9.]+-[0-9]+-generic' "$dir/serial-flannel-worker.log" | tail -1)
   jq -r --arg image "$name" --arg base "$base" --arg kernel "$kernel" '[.matches[].vulnerability.severity] as $s
     | [$image, $base, $kernel, (("Critical", "High", "Medium", "Low") as $l | [$s[] | select(. == $l)] | length | tostring)]
     | "| " + join(" | ") + " |"' "$dir/grype.json" >> notes.md
