@@ -13,7 +13,7 @@ systemctl mask --runtime --now serial-getty@ttyS0
 exec > /dev/ttyS0 2>&1
 set -e
 finish() { trap - EXIT; echo "SMOKE_RESULT=\$1"; sleep 2; poweroff -f; }
-trap 'set +e; systemctl --failed --no-pager; journalctl -u kubelet -u containerd --no-pager | tail -60; kubectl get pods -A -o wide; finish NG' EXIT
+trap 'set +e; systemctl --failed --no-pager; journalctl -u kubelet -u containerd --no-pager | tail -60; kubectl get pods -A -o wide; kubectl logs dns; kubectl -n kube-system logs ds/kube-proxy --tail=40; kubectl -n kube-system logs deploy/coredns --tail=40; finish NG' EXIT
 export KUBECONFIG=/etc/kubernetes/admin.conf
 systemctl is-active qemu-guest-agent
 kubeadm init --kubernetes-version $VERSION --pod-network-cidr 10.244.0.0/16
@@ -22,8 +22,9 @@ kubectl taint nodes --all node-role.kubernetes.io/control-plane-
 kubectl wait --for=condition=Ready node --all --timeout=5m
 kubectl -n kube-system rollout status deploy/coredns --timeout=5m
 # Not Docker Hub, which rate-limits shared runners
-kubectl run dns --image=registry.k8s.io/e2e-test-images/agnhost:2.39 --restart=Never --command -- nslookup kubernetes.default.svc.cluster.local
+kubectl run dns --image=registry.k8s.io/e2e-test-images/agnhost:2.39 --restart=Never --command -- sh -c 'for i in 1 2 3 4 5 6; do date; nslookup kubernetes.default.svc.cluster.local && exit 0; sleep 5; done; exit 1'
 kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/dns --timeout=3m
+kubectl logs dns
 kubectl get nodes -o wide
 kubectl get pods -A -o wide
 systemd-analyze
