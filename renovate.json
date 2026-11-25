@@ -8,7 +8,7 @@
   ],
   "timezone": "Asia/Tokyo",
   "prBodyNotes": [
-    "Run the `build` workflow on this branch with `publish` off before merging."
+    "Run the `build` workflow on this branch before merging. It publishes only from `main`."
   ],
   "customManagers": [
     {
@@ -26,12 +26,24 @@
       "customType": "regex",
       "description": "image-builder",
       "managerFilePatterns": [
-        "/^\\.github/workflows/build\\.yml$/"
+        "/^\\.github/workflows/image\\.yml$/"
       ],
       "matchStrings": [
         "repository: (?<depName>kubernetes-sigs/image-builder)\\n\\s+ref: (?<currentDigest>[0-9a-f]{40}) # (?<currentValue>v\\S+)"
       ],
       "datasourceTemplate": "github-tags"
+    },
+    {
+      "customType": "regex",
+      "description": "Kubernetes versions to publish",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/build\\.yml$/"
+      ],
+      "matchStrings": [
+        "- (?<currentValue>v1\\.\\d+\\.\\d+)\\n"
+      ],
+      "depNameTemplate": "kubernetes/kubernetes",
+      "datasourceTemplate": "github-releases"
     }
   ],
   "packageRules": [
@@ -55,6 +67,17 @@
         "hashicorp/packer-plugin-qemu"
       ],
       "allowedVersions": "/^v1\\.1\\./"
+    },
+    {
+      "description": "Add new Kubernetes minors by hand",
+      "matchDepNames": [
+        "kubernetes/kubernetes"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor"
+      ],
+      "enabled": false
     }
   ]
 }
