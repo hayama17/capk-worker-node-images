@@ -1,0 +1,11 @@
+# The dist-upgrade keeps the kernel of the base image. The build has rebooted into the new one since.
+- name: Remove the other kernels
+  ansible.builtin.shell: |
+    set -euo pipefail
+    dpkg-query -W -f '${db:Status-Abbrev} ${Package}\n' 'linux-*' |
+      awk -v running="-$(uname -r)" '$1 == "ii" && $2 ~ /^linux-(image|modules|modules-extra)-[0-9]/ && !index($2, running) {print $2}' |
+      xargs -r apt-get purge -y
+  args:
+    executable: /bin/bash
+  environment:
+    DEBIAN_FRONTEND: noninteractive

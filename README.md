@@ -99,6 +99,16 @@ verify
 verify --predicate-type https://spdx.dev/Document/v2.3
 ```
 
+## Vulnerabilities
+
+Every build is scanned with grype, and each release carries the result. A build is not published while it contains a vulnerability that can be fixed here:
+
+- an Ubuntu package with a fix available
+- containerd, runc, crictl, the CNI plugins or Kubernetes itself, with a fix available
+- anything known to be exploited, with a fix available
+
+Severity does not matter for that. The rest waits for upstream, mostly the Ubuntu kernel and the Go dependencies of upstream binaries. Exceptions and their reasons are in [`.grype.yaml`](.grype.yaml).
+
 ## License
 
 [Apache-2.0](LICENSE). The software inside the images keeps its own licenses.

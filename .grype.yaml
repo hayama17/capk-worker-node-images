@@ -1,0 +1,6 @@
+# Every entry needs a reason. A CVE-specific one also needs a date to review it.
+ignore:
+  # Debian packages of the preloaded images, which grype compares with Ubuntu 24.04 versions
+  - package:
+      type: deb
+      location: "/var/lib/containerd/**"
