@@ -109,6 +109,8 @@ cp=$!
 boot worker 11 &
 # The worker only exits first when it fails
 wait -n "$cp" $! || true
+# Its last checks may still be running
+timeout 1m sh -c 'until grep -q SMOKE_RESULT serial-worker.log; do sleep 1; done' || true
 sleep 2
 kill "$tail"
 sudo pkill qemu-system || true
