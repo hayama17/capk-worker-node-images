@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Boot the built disk the way KubeVirt does (q35, config drive) and bring up a one-node cluster on it.
+# Boot the built disk the way CAPK does (q35, config drive on virtio) and bring up a one-node cluster on it.
 set -euo pipefail
 
 name=ubuntu-2604-minimal-kube-$VERSION
@@ -32,7 +32,7 @@ xorriso -as mkisofs -quiet -V config-2 -J -r -o "$dir/config.iso" -graft-points 
 timeout 25m qemu-system-x86_64 -M q35 -accel kvm -cpu host -smp 2 -m 4096 -display none -no-reboot -snapshot \
   -serial file:serial.log \
   -drive "file=image-builder/images/capi/output/$name/$name,if=virtio,format=qcow2" \
-  -drive "file=$dir/config.iso,media=cdrom,readonly=on" \
+  -drive "file=$dir/config.iso,if=virtio,format=raw,readonly=on" \
   -device pcie-root-port,id=rp1,slot=1 -netdev user,id=n0 -device virtio-net-pci,bus=rp1,netdev=n0 \
   -device virtio-serial -chardev null,id=ga -device virtserialport,chardev=ga,name=org.qemu.guest_agent.0 || true
 
