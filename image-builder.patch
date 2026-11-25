@@ -83,6 +83,30 @@ index 9c4a1b4..a545886 100644
    - open-vm-tools
  
  common_virt_photon_rpms:
+diff --git a/images/capi/ansible/roles/providers/tasks/qemu.yml b/images/capi/ansible/roles/providers/tasks/qemu.yml
+index 7279b0d..3b1bc4f 100644
+--- a/images/capi/ansible/roles/providers/tasks/qemu.yml
++++ b/images/capi/ansible/roles/providers/tasks/qemu.yml
+@@ -35,19 +35,6 @@
+       - cloud-utils-growpart
+   when: ansible_facts['os_family'] == "RedHat"
+ 
+-- name: Disable Hyper-V daemons on Ubuntu
+-  ansible.builtin.systemd:
+-    name: "{{ item }}"
+-    state: stopped
+-    enabled: false
+-  loop:
+-    - hv-fcopy-daemon
+-    - hv-kvp-daemon
+-    - hv-vss-daemon
+-  when:
+-    - ansible_facts['os_family'] == "Debian"
+-    - ansible_facts['architecture'] != "aarch64"
+-
+ - name: Create directory for DHCP chrony server files
+   ansible.builtin.file:
+     path: /var/lib/dhcp
 diff --git a/images/capi/hack/ensure-ansible.sh b/images/capi/hack/ensure-ansible.sh
 index f767f68..c5c5d4e 100755
 --- a/images/capi/hack/ensure-ansible.sh
