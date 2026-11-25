@@ -2,7 +2,7 @@
 # Boot the built disk the way CAPK does (q35, config drive on virtio) and bring up a one-node cluster on it.
 set -euo pipefail
 
-name=ubuntu-2604-minimal-kube-$VERSION
+name=$OS-kube-$VERSION
 dir=$(mktemp -d)
 mkdir -p "$dir/openstack/latest"
 echo '{"uuid": "smoke", "hostname": "smoke"}' > "$dir/openstack/latest/meta_data.json"

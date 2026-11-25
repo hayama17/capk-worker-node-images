@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the container disk for $VERSION (e.g. v1.37.2) with image-builder.
+# Build the container disk for $OS (e.g. ubuntu-2404-minimal) and $VERSION (e.g. v1.37.2) with image-builder.
 set -euo pipefail
 
 [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "invalid version: $VERSION" >&2; exit 1; }
@@ -13,16 +13,16 @@ sudo apt-get update -q
 sudo apt-get install -y -q qemu-system-x86 qemu-utils xorriso
 sudo chmod 666 /dev/kvm
 
-cp qemu-ubuntu-2604-minimal.json image-builder/images/capi/packer/qemu/
+cp "qemu-$OS.json" image-builder/images/capi/packer/qemu/
 cp -r roles/containerd_apparmor image-builder/images/capi/ansible/roles/
 cd image-builder/images/capi
 export PATH="$HOME/.local/bin:$PATH"
-export QEMU_BUILD_NAMES=qemu-ubuntu-2604-minimal
+export QEMU_BUILD_NAMES=qemu-$OS
 export PACKER_FLAGS="--var kubernetes_semver=$VERSION --var kubernetes_series=$series --var kubernetes_deb_version=$deb"
 # kubeadm v1.37 no longer reads v1beta3
 sed -i s/v1beta3/v1beta4/ ansible/roles/kubernetes/templates/etc/kubeadm.yml
 # Packer looks up plugins anonymously, which shared runners often exhaust
 make deps-qemu || { sleep 300; make deps-qemu; }
-make build-kubevirt-qemu-ubuntu-2604-minimal
+make "build-kubevirt-qemu-$OS"
 ls -lh output/*/
 docker image ls
