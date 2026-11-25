@@ -6,11 +6,12 @@ With a hosted control plane, the API server and etcd run outside the cluster's o
 
 [Kamaji](https://kamaji.clastix.io) is the main use case, but nothing in the images is specific to it. They only expect workers that join with kubeadm.
 
-| v1.34.1 | Pull (compressed) | Disk |
-|---|---:|---:|
-| `quay.io/capk/ubuntu-2404-container-disk` | 2,167 MB | 4.38 GB |
-| Ubuntu minimal as the base | 1,239 MB | 2.72 GB |
-| **+ no control plane images (this repository)** | **964 MB (-56%)** | **2.18 GB (-50%)** |
+| | Kubernetes | Pull (compressed) | Disk |
+|---|---|---:|---:|
+| `quay.io/capk/ubuntu-2404-container-disk` | v1.34.1 | 2,167 MB | 4.38 GB |
+| **This repository** | v1.37.2 | **673 MB** | **1.76 GB** |
+
+Measured in November 2026. The versions differ because v1.34.1 was the newest one CAPK had published.
 
 ```
 ghcr.io/hayama17/capk-worker-node-images/ubuntu-2404-minimal:<kubernetes version>
@@ -22,8 +23,9 @@ ghcr.io/hayama17/capk-worker-node-images/ubuntu-2404-minimal:<kubernetes version
 
 ## What makes it small
 
-- **Minimal base.** The Ubuntu minimal cloud image, plus the packages image-builder expects and `qemu-guest-agent`.
-- **No control plane images.** `kube-apiserver`, `kube-controller-manager`, `kube-scheduler` and `etcd` are never pulled during the build. Only `kube-proxy`, CoreDNS and `pause` are preloaded.
+- **Minimal base.** The Ubuntu minimal cloud image, plus the packages image-builder expects and `qemu-guest-agent`. Saved 928 MB of the pull on v1.34.1.
+- **No control plane images.** `kube-apiserver`, `kube-controller-manager`, `kube-scheduler` and `etcd` are never pulled during the build. Only `kube-proxy`, CoreDNS and `pause` are preloaded. Saved another 275 MB on v1.34.1.
+- **No build leftovers.** image-builder leaves the downloaded `.deb` files behind, including compilers. They were 205 MB on v1.37.2. snapd is removed too.
 
 CI fails if `kube-apiserver` or `etcd` ends up on the disk.
 
