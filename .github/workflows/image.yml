@@ -22,6 +22,7 @@ jobs:
     env:
       OS: ${{ inputs.os }}
       VERSION: ${{ inputs.version }}
+      BUILD: ${{ inputs.version }}-${{ github.run_number }}
       IMAGE: ghcr.io/${{ github.repository }}/${{ inputs.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -42,11 +43,11 @@ jobs:
         run: ./sbom.sh
       - name: Label
         run: |
-          docker build -q --provenance=false -t "$IMAGE:$VERSION" \
+          docker build -q --provenance=false -t "$IMAGE:$BUILD" \
             --label org.opencontainers.image.source="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
             --label org.opencontainers.image.description="Optimized CAPK worker node image for Hosted Control Plane architectures" \
             --label org.opencontainers.image.revision="$GITHUB_SHA" \
-            --label org.opencontainers.image.version="$VERSION" \
+            --label org.opencontainers.image.version="$BUILD" \
             - <<< "FROM $OS-container-disk"
       - name: Push
         if: github.ref == 'refs/heads/main'
@@ -54,14 +55,11 @@ jobs:
         env:
           TOKEN: ${{ github.token }}
         run: |
-          # $VERSION moves to the newest build, the dated tag stays
-          dated=$IMAGE:$VERSION-$(date -u +%Y%m%d%H%M)
           echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          docker tag "$IMAGE:$VERSION" "$dated"
-          docker push "$dated"
-          docker push "$IMAGE:$VERSION"
-          ref=$(docker inspect -f '{{index .RepoDigests 0}}' "$dated")
+          docker push "$IMAGE:$BUILD"
+          ref=$(docker inspect -f '{{index .RepoDigests 0}}' "$IMAGE:$BUILD")
           echo "digest=${ref#*@}" >> "$GITHUB_OUTPUT"
+          echo "| $OS | $VERSION | \`$BUILD\` | \`${ref#*@}\` |" > row.md
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -70,6 +68,7 @@ jobs:
             serial.log
             sbom.spdx.json
             grype.*
+            row.md
           if-no-files-found: ignore
   attest:
     if: github.ref == 'refs/heads/main'
@@ -100,3 +99,18 @@ jobs:
           sbom-path: sbom.spdx.json
           push-to-registry: true
           create-storage-record: false
+      # Users of the moving tag must never see an image that cannot be verified
+      - name: Verify and move the tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE: ${{ needs.build.outputs.image }}
+          DIGEST: ${{ needs.build.outputs.digest }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          for type in https://slsa.dev/provenance/v1 https://spdx.dev/Document/v2.3; do
+            gh attestation verify "oci://$IMAGE@$DIGEST" --bundle-from-oci --predicate-type "$type" \
+              --repo "$GITHUB_REPOSITORY" --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/image.yml" \
+              --source-ref "$GITHUB_REF" --source-digest "$GITHUB_SHA" --deny-self-hosted-runners
+          done
+          docker buildx imagetools create --prefer-index=false -t "$IMAGE:$VERSION" "$IMAGE@$DIGEST"
+          [[ $(docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{.Manifest.Digest}}') == "$DIGEST" ]]
