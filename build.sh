@@ -14,6 +14,7 @@ sudo apt-get install -y -q qemu-system-x86 qemu-utils xorriso
 sudo chmod 666 /dev/kvm
 
 cp qemu-ubuntu-2604-minimal.json image-builder/images/capi/packer/qemu/
+cp -r roles/containerd_apparmor image-builder/images/capi/ansible/roles/
 cd image-builder/images/capi
 export PATH="$HOME/.local/bin:$PATH"
 export QEMU_BUILD_NAMES=qemu-ubuntu-2604-minimal

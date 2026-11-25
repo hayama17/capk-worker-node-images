@@ -1,0 +1,8 @@
+- name: Install the fixed containerd AppArmor profile
+  ansible.builtin.copy:
+    src: cri-containerd
+    dest: /etc/apparmor.d/cri-containerd
+    owner: root
+    group: root
+    mode: "0644"
+    validate: apparmor_parser -QK %s
