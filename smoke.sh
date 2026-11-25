@@ -31,14 +31,12 @@ kubectl taint nodes --all node-role.kubernetes.io/control-plane-
 kubectl wait --for=condition=Ready node --all --timeout=5m
 kubectl -n kube-system rollout status deploy/coredns --timeout=5m
 # Not Docker Hub, which rate-limits shared runners
-kubectl run dns --image=registry.k8s.io/e2e-test-images/agnhost:2.39 --restart=Never --command -- sh -c 'cat /proc/self/attr/current; sleep 60 & kill \$! && { nslookup kubernetes.default.svc.cluster.local || { cp /usr/bin/nslookup /tmp/copy; /tmp/copy kubernetes.default.svc.cluster.local; exit 1; }; }'
+kubectl run dns --image=registry.k8s.io/e2e-test-images/agnhost:2.39 --restart=Never --command -- sh -c 'sleep 60 & kill \$! && nslookup kubernetes.default.svc.cluster.local'
 kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/dns --timeout=3m
 kubectl logs dns
 # containerd/containerd#14485; auditd takes the denials away from the kernel log
 if { journalctl -k --no-pager; cat /var/log/audit/audit.log; } | grep -E 'DENIED.*operation=.signal'; then exit 1; fi
 kubectl get nodes -o wide
-kubectl get pods -A -o wide
-df -h /
 finish OK
 GUEST
 xorriso -as mkisofs -quiet -V config-2 -J -r -o "$dir/config.iso" -graft-points "openstack=$dir/openstack"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Write the SBOM and the known vulnerabilities of the disk inside container disk $1.
+# Write the SBOM and the known vulnerabilities of the built disk.
 set -euo pipefail
 
 . ./versions.env
@@ -12,28 +12,20 @@ fetch() {
 }
 fetch syft "$SYFT_VERSION" "$SYFT_SHA256"
 fetch grype "$GRYPE_VERSION" "$GRYPE_SHA256"
-sudo apt-get update -q
-sudo apt-get install -y -q qemu-utils
 
-# Image scanners only see one qcow2 file, so scan the file system inside it.
-id=$(docker create "$1" none)
-docker cp "$id:/disk/image.qcow2" "$dir/disk.qcow2"
-docker rm "$id" >/dev/null
-qemu-img convert -O raw "$dir/disk.qcow2" "$dir/disk.raw"
-rm "$dir/disk.qcow2"
+qemu-img convert -O raw "image-builder/images/capi/output/$OS-kube-$VERSION/$OS-kube-$VERSION" "$dir/disk.raw"
 mkdir "$dir/root"
 loop=$(sudo losetup -Pfr --show "$dir/disk.raw")
 trap 'sudo umount "$dir/root" || true; sudo losetup -d "$loop"' EXIT
 sudo mount -o ro,noload "${loop}p1" "$dir/root"
 
 sudo SYFT_FILE_METADATA_SELECTION=none "$dir/syft" scan "dir:$dir/root" --base-path "$dir/root" \
-  --source-name "${1%%[:@]*}" --source-version "$VERSION" \
+  --source-name "$OS" --source-version "$VERSION" \
   -o spdx-json=sbom.spdx.json -o syft-json=sbom.syft.json
 sudo chown "$(id -u)" sbom.*.json
 # GitHub rejects attestations over 16 MB, and the file entries alone take most of that.
 jq -c 'del(.files) | .relationships |= map(select(.spdxElementId + .relatedSpdxElement | contains("SPDXRef-File-") | not))' sbom.spdx.json > "$dir/spdx.json"
 mv "$dir/spdx.json" sbom.spdx.json
-ls -lh sbom.*.json
 jq -e --arg v "${VERSION#v}" 'any(.packages[]; .name == "kubelet" and (.versionInfo // "" | startswith($v + "-")))' sbom.spdx.json
 
 # No --fail-on: most matches have no fix upstream yet.

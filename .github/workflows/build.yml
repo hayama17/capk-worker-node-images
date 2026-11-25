@@ -44,6 +44,8 @@ jobs:
         run: ./build.sh
       - name: Boot the image and run a cluster on it
         run: ./smoke.sh
+      - name: SBOM
+        run: ./sbom.sh
       - name: Label
         run: |
           docker build -q --provenance=false -t "$IMAGE:$VERSION" \
@@ -52,7 +54,6 @@ jobs:
             --label org.opencontainers.image.revision="$GITHUB_SHA" \
             --label org.opencontainers.image.version="$VERSION" \
             - <<< "FROM $OS-container-disk"
-          docker inspect -f '{{json .Config.Labels}} {{len .RootFS.Layers}}' "$OS-container-disk" "$IMAGE:$VERSION"
       - name: Push
         if: inputs.publish
         id: push
@@ -70,10 +71,13 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: serial-log
-          path: serial.log
+          name: results
+          path: |
+            serial.log
+            sbom.spdx.json
+            grype.*
           if-no-files-found: ignore
-  provenance:
+  attest:
     if: inputs.publish
     needs: build
     runs-on: ubuntu-24.04
@@ -82,7 +86,10 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - name: Log in to push the attestation
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: results
+      - name: Log in to push the attestations
         env:
           TOKEN: ${{ github.token }}
         run: echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
@@ -92,15 +99,10 @@ jobs:
           subject-digest: ${{ needs.build.outputs.digest }}
           push-to-registry: true
           create-storage-record: false
-  sbom:
-    if: inputs.publish
-    needs: build
-    uses: ./.github/workflows/sbom.yml
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-      attestations: write
-    with:
-      os: ${{ inputs.os }}
-      version: ${{ inputs.version }}
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ needs.build.outputs.image }}
+          subject-digest: ${{ needs.build.outputs.digest }}
+          sbom-path: sbom.spdx.json
+          push-to-registry: true
+          create-storage-record: false

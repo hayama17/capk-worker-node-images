@@ -7,7 +7,6 @@
     "before 9am on monday"
   ],
   "timezone": "Asia/Tokyo",
-  "automerge": false,
   "prBodyNotes": [
     "Run the `build` workflow on this branch with `publish` off before merging."
   ],
@@ -33,17 +32,6 @@
         "repository: (?<depName>kubernetes-sigs/image-builder)\\n\\s+ref: (?<currentDigest>[0-9a-f]{40}) # (?<currentValue>v\\S+)"
       ],
       "datasourceTemplate": "github-tags"
-    },
-    {
-      "customType": "regex",
-      "description": "Manifests used by the smoke test",
-      "managerFilePatterns": [
-        "/^smoke\\.sh$/"
-      ],
-      "matchStrings": [
-        "https://github\\.com/(?<depName>[^/]+/[^/]+)/releases/download/(?<currentValue>v[^/]+)/"
-      ],
-      "datasourceTemplate": "github-releases"
     }
   ],
   "packageRules": [
