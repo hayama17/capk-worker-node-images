@@ -1,0 +1,156 @@
+diff --git a/images/capi/ansible/roles/containerd/tasks/main.yml b/images/capi/ansible/roles/containerd/tasks/main.yml
+index 18a9945..52edb25 100644
+--- a/images/capi/ansible/roles/containerd/tasks/main.yml
++++ b/images/capi/ansible/roles/containerd/tasks/main.yml
+@@ -29,20 +29,21 @@
+ - name: Download containerd
+   ansible.builtin.get_url:
+     url: "{{ containerd_url }}"
+-    checksum: sha256:{{ containerd_url }}.sha256sum
++    checksum: sha256:09a1b669ac6d21e7e24c3c33a9805b48987ba5845e8d88f039c47013a0c0025c
+     dest: /tmp/{{ containerd_filename }}
+     mode: "0600"
+ 
+ - name: Download containerd.service
+   ansible.builtin.get_url:
+     url: "{{ containerd_service_url }}"
++    checksum: sha256:1941362cbaa89dd591b99c32b050d82c583d3cd2e5fa63085d7017457ec5fca8
+     dest: /tmp/containerd.service
+     mode: "0600"
+ 
+ - name: Download runc
+   ansible.builtin.get_url:
+     url: "{{ containerd_runc_url }}"
+-    checksum: sha256:{{ containerd_runc_checksum_url }}
++    checksum: sha256:378e4c545dee19f310bf470fae5b4d1362d740f3f10a5eb6f788ca392c4592de
+     dest: /tmp/runc
+     mode: "0600"
+ 
+diff --git a/images/capi/ansible/roles/kubernetes/tasks/kubeadmpull.yml b/images/capi/ansible/roles/kubernetes/tasks/kubeadmpull.yml
+index b680b05..c78a5b2 100644
+--- a/images/capi/ansible/roles/kubernetes/tasks/kubeadmpull.yml
++++ b/images/capi/ansible/roles/kubernetes/tasks/kubeadmpull.yml
+@@ -6,7 +6,7 @@
+     mode: "0600"
+ 
+ - name: Kubeadm pull images
+-  ansible.builtin.command: kubeadm config images pull --config /etc/kubeadm.yml --cri-socket {{ containerd_cri_socket }}
++  ansible.builtin.shell: kubeadm config images list --config /etc/kubeadm.yml | grep -E '/(kube-proxy|coredns|pause):' | xargs -n1 crictl --runtime-endpoint unix://{{ containerd_cri_socket }} pull
+ 
+ - name: Delete kubeadm config
+   ansible.builtin.file:
+diff --git a/images/capi/ansible/roles/kubernetes/templates/etc/kubeadm.yml b/images/capi/ansible/roles/kubernetes/templates/etc/kubeadm.yml
+index f5d53ff..2b4fdf0 100644
+--- a/images/capi/ansible/roles/kubernetes/templates/etc/kubeadm.yml
++++ b/images/capi/ansible/roles/kubernetes/templates/etc/kubeadm.yml
+@@ -1,11 +1,11 @@
+-apiVersion: kubeadm.k8s.io/v1beta3
++apiVersion: kubeadm.k8s.io/v1beta4
+ kind: ClusterConfiguration
+ imageRepository: {{ kubernetes_container_registry }}
+ kubernetesVersion: {{ kubernetes_semver }}
+ dns:
+   imageRepository: {{ kubernetes_container_registry }}/coredns
+ ---
+-apiVersion: kubeadm.k8s.io/v1beta3
++apiVersion: kubeadm.k8s.io/v1beta4
+ kind: InitConfiguration
+ nodeRegistration:
+   criSocket: {{ containerd_cri_socket }}
+diff --git a/images/capi/hack/ensure-ansible.sh b/images/capi/hack/ensure-ansible.sh
+index f767f68..c5c5d4e 100755
+--- a/images/capi/hack/ensure-ansible.sh
++++ b/images/capi/hack/ensure-ansible.sh
+@@ -49,7 +49,7 @@ fi
+ echo ${ansible_version[*]}
+ 
+ ansible-galaxy collection install \
+-  'community.general:<=12.0.0' \
++  'community.general:12.0.0' \
+   'ansible.posix' \
+   'ansible.windows:>=1.7.0' \
+   community.windows
+diff --git a/images/capi/packer/config.pkr.hcl b/images/capi/packer/config.pkr.hcl
+index 2c5e1f2..4b2a3be 100644
+--- a/images/capi/packer/config.pkr.hcl
++++ b/images/capi/packer/config.pkr.hcl
+@@ -1,11 +1,11 @@
+ packer {
+   required_plugins {
+     ansible = {
+-      version = ">= 1.1.0"
++      version = "1.1.3"
+       source  = "github.com/hashicorp/ansible"
+     }
+     goss = {
+-      version = ">= 3.2.14"
++      version = "3.2.14"
+       source  = "github.com/YaleUniversity/goss"
+     }
+   }
+diff --git a/images/capi/packer/config/containerd.json b/images/capi/packer/config/containerd.json
+index f428175..2aaac80 100644
+--- a/images/capi/packer/config/containerd.json
++++ b/images/capi/packer/config/containerd.json
+@@ -5,6 +5,6 @@
+   "containerd_gvisor_runtime": "false",
+   "containerd_gvisor_version": "latest",
+   "containerd_image_pull_progress_timeout": null,
+-  "containerd_version": "2.3.2",
+-  "runc_version": "1.4.3"
++  "containerd_version": "2.3.7",
++  "runc_version": "1.4.4"
+ }
+diff --git a/images/capi/packer/goss/goss-command.yaml b/images/capi/packer/goss/goss-command.yaml
+index d82a964..b434306 100644
+--- a/images/capi/packer/goss/goss-command.yaml
++++ b/images/capi/packer/goss/goss-command.yaml
+@@ -76,7 +76,7 @@ command:
+     exit-status: 0
+     stderr: []
+     timeout: 0
+-    stdout: ["coredns", "etcd", "kube-apiserver", "kube-controller-manager", "kube-proxy", "kube-scheduler", "pause"]
++    stdout: ["coredns", "kube-proxy", "pause"]
+ {{end}}
+ {{end}}
+ {{if and (eq .Vars.kubernetes_source_type "http") (eq .Vars.kubernetes_cni_source_type "http") (not .Vars.kubernetes_load_additional_imgs)}}
+@@ -93,7 +93,7 @@ command:
+     exit-status: 0
+     stderr: []
+     timeout: 0
+-    stdout: ["coredns", "etcd", "kube-apiserver", "kube-controller-manager", "kube-proxy", "kube-scheduler", "pause"]
++    stdout: ["coredns", "kube-proxy", "pause"]
+ {{end}}
+ {{if eq .Vars.kubernetes_source_type "http"}}
+   kubectl version --client -o json | jq .clientVersion.gitVersion | tr -d '"' | awk '{print substr($1,2); }':
+diff --git a/images/capi/packer/qemu/config.pkr.hcl b/images/capi/packer/qemu/config.pkr.hcl
+index 5fd19df..578b484 100644
+--- a/images/capi/packer/qemu/config.pkr.hcl
++++ b/images/capi/packer/qemu/config.pkr.hcl
+@@ -2,7 +2,7 @@ packer {
+   required_plugins {
+     qemu = {
+       source =  "github.com/hashicorp/qemu"
+-      version = "~> 1.1.0"
++      version = "1.1.3"
+     }
+   }
+ }
+diff --git a/images/capi/packer/qemu/scripts/build_kubevirt_image.sh b/images/capi/packer/qemu/scripts/build_kubevirt_image.sh
+index 1fb0277..b97d213 100644
+--- a/images/capi/packer/qemu/scripts/build_kubevirt_image.sh
++++ b/images/capi/packer/qemu/scripts/build_kubevirt_image.sh
+@@ -6,10 +6,7 @@ echo "########"
+ env
+ cd $OUTPUT_DIR
+ 
+-echo "FROM registry.access.redhat.com/ubi8/ubi:latest AS builder                                                
+-ADD --chown=107:107 $ARTIFACT_NAME /disk/image.qcow2                                            
+-                                                                                                                
+-FROM scratch                                                                                                    
+-COPY --from=builder /disk/* /disk/" > ./kubevirt-Dockerfile
++echo "FROM scratch
++ADD --chown=107:107 $ARTIFACT_NAME /disk/image.qcow2" > ./kubevirt-Dockerfile
+ 
+ docker build -f ./kubevirt-Dockerfile . -t $1
+\ No newline at end of file

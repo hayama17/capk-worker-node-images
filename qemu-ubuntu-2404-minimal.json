@@ -6,10 +6,10 @@
   "distro_name": "ubuntu",
   "extra_debs": "qemu-guest-agent networkd-dispatcher bash-completion iptables python3-debian",
   "guest_os_type": "ubuntu-64",
-  "iso_checksum": "https://cloud-images.ubuntu.com/minimal/releases/noble/release/SHA256SUMS",
-  "iso_checksum_type": "file",
+  "iso_checksum_type": "sha256",
   "iso_url": "https://cloud-images.ubuntu.com/minimal/releases/noble/release/ubuntu-24.04-minimal-cloudimg-amd64.img",
   "memory": "4096",
+  "node_custom_roles_post": "no_snapd",
   "os_display_name": "Ubuntu 24.04",
-  "shutdown_command": "shutdown -P now"
+  "shutdown_command": "rm -rf /tmp/goss* /etc/ssh/sshd_config.d/50-cloud-init.conf; apt-get clean; fstrim /; shutdown -P now"
 }

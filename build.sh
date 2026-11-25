@@ -13,19 +13,21 @@ sudo apt-get update -q
 sudo apt-get install -y -q qemu-system-x86 qemu-utils xorriso
 sudo chmod 666 /dev/kvm
 
+# The base image follows Ubuntu's latest release, so trust the signature rather than a pinned digest
+base=$(jq -r .iso_url "qemu-$OS.json")
+sums=$(mktemp -d)
+curl -fsSL --output-dir "$sums" -O "${base%/*}/SHA256SUMS" -O "${base%/*}/SHA256SUMS.gpg"
+gpgv --keyring /usr/share/keyrings/ubuntu-cloudimage-keyring.gpg "$sums/SHA256SUMS.gpg" "$sums/SHA256SUMS"
+sha=$(awk -v f="${base##*/}" '{sub(/^\*/, "", $2)} $2==f{print $1}' "$sums/SHA256SUMS")
+[[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "no checksum for $base" >&2; exit 1; }
+
+git -C image-builder apply ../image-builder.patch
 cp "qemu-$OS.json" image-builder/images/capi/packer/qemu/
-cp -r roles/containerd_apparmor image-builder/images/capi/ansible/roles/
+cp -r roles/* image-builder/images/capi/ansible/roles/
 cd image-builder/images/capi
 export PATH="$HOME/.local/bin:$PATH"
 export QEMU_BUILD_NAMES=qemu-$OS
-export PACKER_FLAGS="--var kubernetes_semver=$VERSION --var kubernetes_series=$series --var kubernetes_deb_version=$deb"
-# kubeadm v1.37 no longer reads v1beta3
-sed -i s/v1beta3/v1beta4/ ansible/roles/kubernetes/templates/etc/kubeadm.yml
-# Workers of a hosted control plane only run these
-pull=ansible/roles/kubernetes/tasks/kubeadmpull.yml
-sed -i "s#command: kubeadm config images pull --config /etc/kubeadm.yml --cri-socket \(.*\)#shell: kubeadm config images list --config /etc/kubeadm.yml | grep -E '/(kube-proxy|coredns|pause):' | xargs -n1 crictl --runtime-endpoint unix://\1 pull#" $pull
-grep -q 'crictl .* pull$' $pull
-sed -i 's/"etcd", "kube-apiserver", "kube-controller-manager", "kube-proxy", "kube-scheduler", "pause"/"kube-proxy", "pause"/' packer/goss/goss-command.yaml
+export PACKER_FLAGS="--var kubernetes_semver=$VERSION --var kubernetes_series=$series --var kubernetes_deb_version=$deb --var iso_checksum=$sha"
 # Packer looks up plugins anonymously, which shared runners often exhaust
 make deps-qemu || { sleep 300; make deps-qemu; }
 make "build-kubevirt-qemu-$OS"

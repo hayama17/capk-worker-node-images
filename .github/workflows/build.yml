@@ -13,14 +13,18 @@ on:
         description: Push to GHCR
         type: boolean
         default: false
-permissions:
-  contents: read
-  packages: write
+permissions: {}
 concurrency: build-${{ inputs.os }}-${{ inputs.version }}
 jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ env.IMAGE }}
+      digest: ${{ steps.push.outputs.digest }}
     env:
       OS: ${{ inputs.os }}
       VERSION: ${{ inputs.version }}
@@ -35,17 +39,7 @@ jobs:
           ref: b90539cc0e4847de2e03e16f943ab457708c00b7 # v0.1.55
           path: image-builder
           persist-credentials: false
-      # image-builder prints its environment while building, so the token is only passed to the steps that need it.
-      - name: Refuse to overwrite a published tag
-        if: inputs.publish
-        env:
-          TOKEN: ${{ github.token }}
-        run: |
-          echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          if docker manifest inspect "$IMAGE:$VERSION" >/dev/null 2>&1; then
-            echo "::error::$IMAGE:$VERSION already exists"; exit 1
-          fi
-          docker logout ghcr.io
+      # image-builder prints its environment while building, so its steps get no token and signing is left to another job.
       - name: Build
         run: ./build.sh
       - name: Boot the image and run a cluster on it
@@ -61,14 +55,52 @@ jobs:
           docker inspect -f '{{json .Config.Labels}} {{len .RootFS.Layers}}' "$OS-container-disk" "$IMAGE:$VERSION"
       - name: Push
         if: inputs.publish
+        id: push
         env:
           TOKEN: ${{ github.token }}
         run: |
+          # $VERSION moves to the newest build, the dated tag stays
+          dated=$IMAGE:$VERSION-$(date -u +%Y%m%d%H%M)
           echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker tag "$IMAGE:$VERSION" "$dated"
+          docker push "$dated"
           docker push "$IMAGE:$VERSION"
+          ref=$(docker inspect -f '{{index .RepoDigests 0}}' "$dated")
+          echo "digest=${ref#*@}" >> "$GITHUB_OUTPUT"
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: serial-log
           path: serial.log
           if-no-files-found: ignore
+  provenance:
+    if: inputs.publish
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Log in to push the attestation
+        env:
+          TOKEN: ${{ github.token }}
+        run: echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ needs.build.outputs.image }}
+          subject-digest: ${{ needs.build.outputs.digest }}
+          push-to-registry: true
+          create-storage-record: false
+  sbom:
+    if: inputs.publish
+    needs: build
+    uses: ./.github/workflows/sbom.yml
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    with:
+      os: ${{ inputs.os }}
+      version: ${{ inputs.version }}

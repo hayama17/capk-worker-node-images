@@ -1,0 +1,6 @@
+- name: Remove snapd
+  ansible.builtin.apt:
+    name: snapd
+    state: absent
+    purge: true
+    lock_timeout: 300
