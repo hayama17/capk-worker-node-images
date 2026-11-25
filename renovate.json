@@ -44,6 +44,19 @@
       ],
       "depNameTemplate": "kubernetes/kubernetes",
       "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "Ubuntu base images",
+      "managerFilePatterns": [
+        "/^qemu-.+\\.json$/"
+      ],
+      "matchStrings": [
+        "\"iso_checksum\": \"(?<currentDigest>[0-9a-f]{64})\",\\s+\"iso_checksum_type\": \"sha256\",\\s+\"iso_url\": \"https://cloud-images\\.ubuntu\\.com/minimal/releases/\\w+/release-(?<currentValue>[0-9.]+)/ubuntu-(?<packageName>[0-9.]+)-minimal"
+      ],
+      "depNameTemplate": "ubuntu-minimal-{{packageName}}",
+      "datasourceTemplate": "custom.ubuntu-minimal",
+      "versioningTemplate": "loose"
     }
   ],
   "packageRules": [
@@ -79,5 +92,13 @@
       ],
       "enabled": false
     }
-  ]
+  ],
+  "customDatasources": {
+    "ubuntu-minimal": {
+      "defaultRegistryUrlTemplate": "https://cloud-images.ubuntu.com/minimal/releases/streams/v1/com.ubuntu.cloud:released:download.json",
+      "transformTemplates": [
+        "{\"releases\": [$each($lookup(products, 'com.ubuntu.cloud:minimal:{{packageName}}:amd64').versions, function($v, $k) { {\"version\": $k, \"digest\": $lookup($v.items, 'disk1.img').sha256} })]}"
+      ]
+    }
+  }
 }

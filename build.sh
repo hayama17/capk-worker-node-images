@@ -13,13 +13,12 @@ sudo apt-get update -q
 sudo apt-get install -y -q qemu-system-x86 qemu-utils xorriso
 sudo chmod 666 /dev/kvm
 
-# The base image follows Ubuntu's latest release, so trust the signature rather than a pinned digest
+# The pinned base image has to be one that Ubuntu signed
 base=$(jq -r .iso_url "qemu-$OS.json")
 sums=$(mktemp -d)
 curl -fsSL --output-dir "$sums" -O "${base%/*}/SHA256SUMS" -O "${base%/*}/SHA256SUMS.gpg"
 gpgv --keyring /usr/share/keyrings/ubuntu-cloudimage-keyring.gpg "$sums/SHA256SUMS.gpg" "$sums/SHA256SUMS"
-sha=$(awk -v f="${base##*/}" '{sub(/^\*/, "", $2)} $2==f{print $1}' "$sums/SHA256SUMS")
-[[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "no checksum for $base" >&2; exit 1; }
+grep -xF "$(jq -r .iso_checksum "qemu-$OS.json") *${base##*/}" "$sums/SHA256SUMS"
 
 git -C image-builder apply ../image-builder.patch
 cp "qemu-$OS.json" image-builder/images/capi/packer/qemu/
@@ -27,7 +26,7 @@ cp -r roles/* image-builder/images/capi/ansible/roles/
 cd image-builder/images/capi
 export PATH="$HOME/.local/bin:$PATH"
 export QEMU_BUILD_NAMES=qemu-$OS
-export PACKER_FLAGS="--var kubernetes_semver=$VERSION --var kubernetes_series=$series --var kubernetes_deb_version=$deb --var iso_checksum=$sha --var containerd_version=${CONTAINERD_VERSION#v} --var runc_version=${RUNC_VERSION#v} --var crictl_version=${CRICTL_VERSION#v}"
+export PACKER_FLAGS="--var kubernetes_semver=$VERSION --var kubernetes_series=$series --var kubernetes_deb_version=$deb --var containerd_version=${CONTAINERD_VERSION#v} --var runc_version=${RUNC_VERSION#v} --var crictl_version=${CRICTL_VERSION#v}"
 # packer init has no pinned hash, and its anonymous API calls often exceed the limit of shared runners
 plugin() {
   local dir=$HOME/.config/packer/plugins/github.com/${1,,} file=packer-plugin-${1#*/}_$2_x5.0_linux_amd64
