@@ -19,7 +19,7 @@ ghcr.io/hayama17/capk-worker-node-images/ubuntu-2404-minimal:<kubernetes version
 
 [Published versions](https://github.com/hayama17/capk-worker-node-images/pkgs/container/capk-worker-node-images%2Fubuntu-2404-minimal). Pulling needs no login.
 
-`<version>` moves to the newest build of that Kubernetes version. `<version>-<UTC time>` stays, so use it to pin or roll back.
+`<version>` moves to the newest build of that Kubernetes version. `<version>-<build>` never moves, so use it to pin or roll back. There is no `latest`, because a worker has to match the version of its cluster. The [releases](https://github.com/hayama17/capk-worker-node-images/releases) list what each build contains.
 
 ## What makes it small
 
