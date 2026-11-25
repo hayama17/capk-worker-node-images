@@ -29,7 +29,6 @@ kubectl logs dns
 if { journalctl -k --no-pager; cat /var/log/audit/audit.log; } | grep -E 'DENIED.*operation=.signal'; then exit 1; fi
 kubectl get nodes -o wide
 kubectl get pods -A -o wide
-systemd-analyze
 df -h /
 finish OK
 GUEST
