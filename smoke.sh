@@ -16,6 +16,8 @@ finish() { trap - EXIT; echo "SMOKE_RESULT=\$1"; sleep 2; poweroff -f; }
 trap 'set +e; systemctl --failed --no-pager; journalctl -u kubelet -u containerd --no-pager | tail -60; kubectl get pods -A -o wide; kubectl logs dns; kubectl -n kube-system logs ds/kube-proxy --tail=40; kubectl -n kube-system logs deploy/coredns --tail=40; { journalctl -k --no-pager; cat /var/log/audit/audit.log; } | grep DENIED | tail -20; finish NG' EXIT
 export KUBECONFIG=/etc/kubernetes/admin.conf
 systemctl is-active qemu-guest-agent
+crictl images
+if crictl images | grep -E '/(kube-apiserver|etcd) '; then exit 1; fi
 kubeadm init --kubernetes-version $VERSION --pod-network-cidr 10.244.0.0/16
 kubectl apply -f https://github.com/flannel-io/flannel/releases/download/v0.28.11/kube-flannel.yml
 kubectl taint nodes --all node-role.kubernetes.io/control-plane-

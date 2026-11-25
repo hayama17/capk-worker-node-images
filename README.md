@@ -2,7 +2,7 @@
 
 Worker node images for [Cluster API Provider KubeVirt](https://github.com/kubernetes-sigs/cluster-api-provider-kubevirt) (CAPK), made for [Kamaji](https://kamaji.clastix.io) tenant clusters.
 
-Built with [image-builder](https://github.com/kubernetes-sigs/image-builder) from the Ubuntu minimal cloud images, one tag per Kubernetes version. Not for control plane nodes.
+Built with [image-builder](https://github.com/kubernetes-sigs/image-builder) from the Ubuntu minimal cloud images, one tag per Kubernetes version. The control plane images are left out, so these are not for control plane nodes.
 
 ```
 ghcr.io/hayama17/capk-worker-node-images/ubuntu-2404-minimal:<version>
