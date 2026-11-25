@@ -65,7 +65,7 @@ jobs:
         with:
           name: results-${{ inputs.os }}-${{ inputs.version }}
           path: |
-            serial.log
+            serial-*.log
             sbom.spdx.json
             grype.*
             row.md
