@@ -10,7 +10,7 @@
   "iso_checksum_type": "sha256",
   "iso_url": "https://cloud-images.ubuntu.com/minimal/releases/resolute/release-20261124/ubuntu-26.04-minimal-cloudimg-amd64.img",
   "memory": "4096",
-  "node_custom_roles_post": "containerd_apparmor no_snapd cni_plugins",
+  "node_custom_roles_post": "containerd_apparmor no_snapd cni_plugins old_kernels",
   "os_display_name": "Ubuntu 26.04",
   "shutdown_command": "rm -rf /tmp/goss* /etc/ssh/sshd_config.d/50-cloud-init.conf; apt-get clean; fstrim /; shutdown -P now"
 }
