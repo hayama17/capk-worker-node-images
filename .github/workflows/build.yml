@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: kubernetes-sigs/image-builder
-          ref: b90539cc0e4847de2e03e16f943ab457708c00b7 # v0.1.55
+          ref: 7ffb9b7f1f26cd66891874463cc9411e3633325f # v0.1.55
           path: image-builder
           persist-credentials: false
       # image-builder prints its environment while building, so its steps get no token and signing is left to another job.

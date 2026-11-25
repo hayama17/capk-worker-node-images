@@ -2,17 +2,16 @@
 # Write the SBOM and the known vulnerabilities of the disk inside container disk $1.
 set -euo pipefail
 
-SYFT=1.57.2 SYFT_SHA=ad92bd3ec1b94a3df01d4d0aec199afa9c42b72e86da436ff5f837914d32706b
-GRYPE=0.122.1 GRYPE_SHA=f1ba7e2917ee1395618de20a98da0aa7c0fb1788927797651047c50502a37538
+. ./versions.env
 
 dir=$(mktemp -d)
 fetch() {
-  curl -fsSL -o "$dir/$1.tgz" "https://github.com/anchore/$1/releases/download/v$2/$1_$2_linux_amd64.tar.gz"
+  curl -fsSL -o "$dir/$1.tgz" "https://github.com/anchore/$1/releases/download/$2/$1_${2#v}_linux_amd64.tar.gz"
   echo "$3  $dir/$1.tgz" | sha256sum -c -
   tar -xzf "$dir/$1.tgz" -C "$dir" "$1"
 }
-fetch syft "$SYFT" "$SYFT_SHA"
-fetch grype "$GRYPE" "$GRYPE_SHA"
+fetch syft "$SYFT_VERSION" "$SYFT_SHA256"
+fetch grype "$GRYPE_VERSION" "$GRYPE_SHA256"
 sudo apt-get update -q
 sudo apt-get install -y -q qemu-utils
 

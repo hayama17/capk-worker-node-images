@@ -1,0 +1,79 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "schedule": [
+    "before 9am on monday"
+  ],
+  "timezone": "Asia/Tokyo",
+  "automerge": false,
+  "prBodyNotes": [
+    "Run the `build` workflow on this branch with `publish` off before merging."
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Release assets and their sha256",
+      "managerFilePatterns": [
+        "/^versions\\.env$/"
+      ],
+      "matchStrings": [
+        "# renovate: depName=(?<depName>\\S+)\\n\\w+_VERSION=(?<currentValue>\\S+)\\n\\w+_SHA256=(?<currentDigest>[0-9a-f]{64})"
+      ],
+      "datasourceTemplate": "github-release-attachments"
+    },
+    {
+      "customType": "regex",
+      "description": "image-builder",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/build\\.yml$/"
+      ],
+      "matchStrings": [
+        "repository: (?<depName>kubernetes-sigs/image-builder)\\n\\s+ref: (?<currentDigest>[0-9a-f]{40}) # (?<currentValue>v\\S+)"
+      ],
+      "datasourceTemplate": "github-tags"
+    },
+    {
+      "customType": "regex",
+      "description": "Packer plugins",
+      "managerFilePatterns": [
+        "/^image-builder\\.patch$/"
+      ],
+      "matchStrings": [
+        "\\+ +version = \"(?<currentValue>[^\"]+)\"\\n +source += +\"github\\.com/(?<depName>[^\"]+)\"",
+        "source += +\"github\\.com/(?<depName>[^\"]+)\"\\n-.*\\n\\+ +version = \"(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "github-releases",
+      "packageNameTemplate": "{{{replace '/' '/packer-plugin-' depName}}}",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Manifests used by the smoke test",
+      "managerFilePatterns": [
+        "/^smoke\\.sh$/"
+      ],
+      "matchStrings": [
+        "https://github\\.com/(?<depName>[^/]+/[^/]+)/releases/download/(?<currentValue>v[^/]+)/"
+      ],
+      "datasourceTemplate": "github-releases"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Stay on the LTS line",
+      "matchDepNames": [
+        "containerd/containerd"
+      ],
+      "allowedVersions": "/^v2\\.3\\./"
+    },
+    {
+      "description": "Stay on the line image-builder uses",
+      "matchDepNames": [
+        "opencontainers/runc"
+      ],
+      "allowedVersions": "/^v1\\.4\\./"
+    }
+  ]
+}

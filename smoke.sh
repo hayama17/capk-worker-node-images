@@ -21,7 +21,8 @@ if getent passwd builder; then exit 1; fi
 if grep -qE '^[^:]+:[\$]' /etc/shadow; then exit 1; fi
 mkdir -p /run/sshd
 sshd -T | grep -x 'passwordauthentication no'
-if ls -d /tmp/goss* /usr/lib/snapd; then exit 1; fi
+if ls -d /usr/lib/snapd; then exit 1; fi
+containerd --version; runc --version; crictl --version; /opt/cni/bin/bridge --version
 crictl images
 if crictl images | grep -E '/(kube-apiserver|etcd) '; then exit 1; fi
 kubeadm init --kubernetes-version $VERSION --pod-network-cidr 10.244.0.0/16

@@ -14,7 +14,9 @@ With [Kamaji](https://kamaji.clastix.io), control planes run as pods, so every V
 ghcr.io/hayama17/capk-worker-node-images/ubuntu-2404-minimal:<kubernetes version>
 ```
 
-[Published versions](https://github.com/hayama17/capk-worker-node-images/pkgs/container/capk-worker-node-images%2Fubuntu-2404-minimal). Pulling needs no login, and the build refuses to overwrite a published tag.
+[Published versions](https://github.com/hayama17/capk-worker-node-images/pkgs/container/capk-worker-node-images%2Fubuntu-2404-minimal). Pulling needs no login.
+
+`<version>` moves to the newest build of that Kubernetes version. `<version>-<UTC time>` stays, so use it to pin or roll back.
 
 ## What makes it small
 
@@ -37,6 +39,7 @@ volumes:
   - name: containervolume
     containerDisk:
       image: ghcr.io/hayama17/capk-worker-node-images/ubuntu-2404-minimal:v1.37.2
+      imagePullPolicy: Always # pick up rebuilds of the same tag
 ```
 
 ## What is inside
@@ -62,13 +65,14 @@ gh workflow run build.yml -R <you>/capk-worker-node-images -f version=v1.37.2 -f
 
 [`build.sh`](build.sh) drives a pinned [image-builder](https://github.com/kubernetes-sigs/image-builder). `ubuntu-2604-minimal` can be built too, but it is not published because it fails the smoke test.
 
-## SBOM
+## Verify
 
-The [`sbom`](.github/workflows/sbom.yml) workflow attaches an SPDX SBOM of the disk to a published image. So far only v1.37.2 has one.
+New builds carry a build provenance and an SPDX SBOM of the disk. Older ones may not.
 
 ```bash
-gh attestation verify oci://ghcr.io/hayama17/capk-worker-node-images/ubuntu-2404-minimal:v1.37.2 \
-  --repo hayama17/capk-worker-node-images --predicate-type https://spdx.dev/Document/v2.3
+image=oci://ghcr.io/hayama17/capk-worker-node-images/ubuntu-2404-minimal:v1.37.2
+gh attestation verify "$image" --repo hayama17/capk-worker-node-images
+gh attestation verify "$image" --repo hayama17/capk-worker-node-images --predicate-type https://spdx.dev/Document/v2.3
 ```
 
 ## License

@@ -1,0 +1,23 @@
+# The kubernetes-cni package lags behind, so replace the plugins it installed.
+- name: Download the CNI plugins
+  vars:
+    version: "{{ lookup('env', 'CNI_VERSION') }}"
+  ansible.builtin.get_url:
+    url: "https://github.com/containernetworking/plugins/releases/download/{{ version }}/cni-plugins-linux-amd64-{{ version }}.tgz"
+    checksum: "sha256:{{ lookup('env', 'CNI_SHA256') }}"
+    dest: /var/cache/cni-plugins.tgz
+    mode: "0600"
+
+- name: Unpack the CNI plugins
+  ansible.builtin.unarchive:
+    remote_src: true
+    src: /var/cache/cni-plugins.tgz
+    dest: /opt/cni/bin
+    owner: root
+    group: root
+    extra_opts: [--no-overwrite-dir]
+
+- name: Remove the archive
+  ansible.builtin.file:
+    path: /var/cache/cni-plugins.tgz
+    state: absent

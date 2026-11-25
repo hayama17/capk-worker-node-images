@@ -1,5 +1,5 @@
 diff --git a/images/capi/ansible/roles/containerd/tasks/main.yml b/images/capi/ansible/roles/containerd/tasks/main.yml
-index 18a9945..52edb25 100644
+index 18a9945..606cafb 100644
 --- a/images/capi/ansible/roles/containerd/tasks/main.yml
 +++ b/images/capi/ansible/roles/containerd/tasks/main.yml
 @@ -29,20 +29,21 @@
@@ -7,14 +7,14 @@ index 18a9945..52edb25 100644
    ansible.builtin.get_url:
      url: "{{ containerd_url }}"
 -    checksum: sha256:{{ containerd_url }}.sha256sum
-+    checksum: sha256:09a1b669ac6d21e7e24c3c33a9805b48987ba5845e8d88f039c47013a0c0025c
++    checksum: "sha256:{{ lookup('env', 'CONTAINERD_SHA256') }}"
      dest: /tmp/{{ containerd_filename }}
      mode: "0600"
  
  - name: Download containerd.service
    ansible.builtin.get_url:
      url: "{{ containerd_service_url }}"
-+    checksum: sha256:1941362cbaa89dd591b99c32b050d82c583d3cd2e5fa63085d7017457ec5fca8
++    checksum: "sha256:{{ lookup('env', 'CONTAINERD_SERVICE_SHA256') }}"
      dest: /tmp/containerd.service
      mode: "0600"
  
@@ -22,8 +22,21 @@ index 18a9945..52edb25 100644
    ansible.builtin.get_url:
      url: "{{ containerd_runc_url }}"
 -    checksum: sha256:{{ containerd_runc_checksum_url }}
-+    checksum: sha256:378e4c545dee19f310bf470fae5b4d1362d740f3f10a5eb6f788ca392c4592de
++    checksum: "sha256:{{ lookup('env', 'RUNC_SHA256') }}"
      dest: /tmp/runc
+     mode: "0600"
+ 
+diff --git a/images/capi/ansible/roles/kubernetes/tasks/crictl-url.yml b/images/capi/ansible/roles/kubernetes/tasks/crictl-url.yml
+index 2cee7a5..b455ca4 100644
+--- a/images/capi/ansible/roles/kubernetes/tasks/crictl-url.yml
++++ b/images/capi/ansible/roles/kubernetes/tasks/crictl-url.yml
+@@ -15,7 +15,7 @@
+ - name: Download crictl
+   ansible.builtin.get_url:
+     url: "{{ crictl_url }}"
+-    checksum: sha256:{{ crictl_url }}.sha256
++    checksum: "sha256:{{ lookup('env', 'CRICTL_SHA256') }}"
+     dest: /tmp/{{ crictl_filename }}
      mode: "0600"
  
 diff --git a/images/capi/ansible/roles/kubernetes/tasks/kubeadmpull.yml b/images/capi/ansible/roles/kubernetes/tasks/kubeadmpull.yml
@@ -88,19 +101,6 @@ index 2c5e1f2..4b2a3be 100644
        source  = "github.com/YaleUniversity/goss"
      }
    }
-diff --git a/images/capi/packer/config/containerd.json b/images/capi/packer/config/containerd.json
-index f428175..2aaac80 100644
---- a/images/capi/packer/config/containerd.json
-+++ b/images/capi/packer/config/containerd.json
-@@ -5,6 +5,6 @@
-   "containerd_gvisor_runtime": "false",
-   "containerd_gvisor_version": "latest",
-   "containerd_image_pull_progress_timeout": null,
--  "containerd_version": "2.3.2",
--  "runc_version": "1.4.3"
-+  "containerd_version": "2.3.7",
-+  "runc_version": "1.4.4"
- }
 diff --git a/images/capi/packer/goss/goss-command.yaml b/images/capi/packer/goss/goss-command.yaml
 index d82a964..b434306 100644
 --- a/images/capi/packer/goss/goss-command.yaml
