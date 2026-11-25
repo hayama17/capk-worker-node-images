@@ -59,6 +59,18 @@ Nothing is pushed before it passes [`smoke.sh`](smoke.sh). It boots the disk the
 
 It does not run Kamaji, CAPK, Cilium or storage drivers.
 
+## Retention
+
+The registry holds the images that can be used now. The [releases](https://github.com/hayama17/capk-worker-node-images/releases) keep the history.
+
+| State | Which | Kept builds |
+|---|---|---|
+| Active | Listed in [`build.yml`](.github/workflows/build.yml) | 3 |
+| Archived | Replaced by a newer patch | 1, so existing clusters can still add workers |
+| End of life | Minor out of upstream support | Removed by hand, after an announcement |
+
+Provenance and SBOM are kept as long as their image. **A pinned build tag or digest stops resolving once that build is retired**, so mirror it if you need it for longer.
+
 ## Build your own
 
 Fork the repository, enable Actions, list the versions you want in [`build.yml`](.github/workflows/build.yml), and run it. It publishes to the GHCR of the fork from `main`, and only builds and tests from other branches.
