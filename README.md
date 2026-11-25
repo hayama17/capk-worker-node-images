@@ -1,8 +1,10 @@
 # capk-worker-node-images
 
-**Worker-only node images for [Cluster API Provider KubeVirt](https://github.com/kubernetes-sigs/cluster-api-provider-kubevirt) (CAPK), at less than half the size.**
+**Optimized [Cluster API Provider KubeVirt](https://github.com/kubernetes-sigs/cluster-api-provider-kubevirt) (CAPK) worker node images for Hosted Control Plane architectures.**
 
-With [Kamaji](https://kamaji.clastix.io), control planes run as pods, so every VM is a worker. These images leave the control plane out.
+With a hosted control plane, the API server and etcd run outside the cluster's own nodes, so every VM is a worker. General-purpose node images still carry the control plane. These leave it out, at less than half the size.
+
+[Kamaji](https://kamaji.clastix.io) is the main use case, but nothing in the images is specific to it. They only expect workers that join with kubeadm.
 
 | v1.34.1 | Pull (compressed) | Disk |
 |---|---:|---:|

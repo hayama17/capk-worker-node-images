@@ -48,7 +48,7 @@ jobs:
         run: |
           docker build -q --provenance=false -t "$IMAGE:$VERSION" \
             --label org.opencontainers.image.source="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
-            --label org.opencontainers.image.description="Worker-only node image for CAPK and Kamaji" \
+            --label org.opencontainers.image.description="Optimized CAPK worker node image for Hosted Control Plane architectures" \
             --label org.opencontainers.image.revision="$GITHUB_SHA" \
             --label org.opencontainers.image.version="$VERSION" \
             - <<< "FROM $OS-container-disk"
