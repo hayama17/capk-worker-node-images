@@ -70,6 +70,19 @@ index f5d53ff..2b4fdf0 100644
  kind: InitConfiguration
  nodeRegistration:
    criSocket: {{ containerd_cri_socket }}
+diff --git a/images/capi/ansible/roles/node/defaults/main.yml b/images/capi/ansible/roles/node/defaults/main.yml
+index 9c4a1b4..a545886 100644
+--- a/images/capi/ansible/roles/node/defaults/main.yml
++++ b/images/capi/ansible/roles/node/defaults/main.yml
+@@ -107,8 +107,6 @@ common_virt_debs_arm64:
+   - open-vm-tools
+ 
+ common_virt_debs:
+-  - linux-cloud-tools-virtual
+-  - linux-tools-virtual
+   - open-vm-tools
+ 
+ common_virt_photon_rpms:
 diff --git a/images/capi/hack/ensure-ansible.sh b/images/capi/hack/ensure-ansible.sh
 index f767f68..c5c5d4e 100755
 --- a/images/capi/hack/ensure-ansible.sh
@@ -105,6 +118,19 @@ index d82a964..b434306 100644
  {{end}}
  {{if eq .Vars.kubernetes_source_type "http"}}
    kubectl version --client -o json | jq .clientVersion.gitVersion | tr -d '"' | awk '{print substr($1,2); }':
+diff --git a/images/capi/packer/goss/goss-vars.yaml b/images/capi/packer/goss/goss-vars.yaml
+index 68057fd..18d5036 100644
+--- a/images/capi/packer/goss/goss-vars.yaml
++++ b/images/capi/packer/goss/goss-vars.yaml
+@@ -491,8 +491,6 @@ ubuntu:
+         enabled: true
+         running: true
+     package:
+-      linux-cloud-tools-virtual:
+-      linux-tools-virtual:
+       open-vm-tools:
+       cloud-guest-utils:
+       cloud-initramfs-copymods:
 diff --git a/images/capi/packer/qemu/scripts/build_kubevirt_image.sh b/images/capi/packer/qemu/scripts/build_kubevirt_image.sh
 index 1fb0277..b97d213 100644
 --- a/images/capi/packer/qemu/scripts/build_kubevirt_image.sh

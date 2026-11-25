@@ -28,6 +28,7 @@ jq -c 'del(.files) | .relationships |= map(select(.spdxElementId + .relatedSpdxE
 mv "$dir/spdx.json" sbom.spdx.json
 jq -e --arg v "${VERSION#v}" 'any(.packages[]; .name == "kubelet" and (.versionInfo // "" | startswith($v + "-")))' sbom.spdx.json
 
-# No --fail-on: most matches have no fix upstream yet.
-"$dir/grype" sbom:sbom.syft.json -o json=grype.json -o table=grype.txt
+"$dir/grype" -c .grype.yaml sbom:sbom.syft.json -o json=grype.json -o table=grype.txt
 jq -r '.matches | group_by(.vulnerability.severity)[] | "\(.[0].vulnerability.severity): \(length)"' grype.json
+blockers=$(jq -rf blockers.jq grype.json)
+[[ -z "$blockers" ]] || { echo "::error::fixed vulnerabilities are still in the image"; echo "$blockers"; exit 1; }
