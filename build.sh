@@ -43,4 +43,7 @@ plugin YaleUniversity/goss "$PACKER_GOSS_VERSION" "$PACKER_GOSS_SHA256"
 # Galaxy sometimes answers with garbage, and ansible-galaxy caches it
 make deps-qemu || { rm -rf ~/.ansible/galaxy_cache; sleep 60; make deps-qemu; }
 make "build-kubevirt-qemu-$OS"
-ls -lh output/*/
+# Raise the limit only when something is added on purpose
+size=$(stat -c %s "output/$OS-kube-$VERSION/$OS-kube-$VERSION")
+echo "disk: $size bytes"
+((size < 1900000000)) || { echo "::error::the disk grew past the limit"; exit 1; }

@@ -71,6 +71,13 @@ kubectl wait --for=condition=Ready pod/exec --timeout=3m
 [[ \$(kubectl get pod exec -o jsonpath='{.spec.nodeName}') == worker ]]
 kubectl exec exec -- cat /etc/hostname | grep -x exec
 kubectl get nodes,pods -A -o wide
+# The worker waits for this pod, checks itself, and reboots
+boot=\$(kubectl get node worker -o jsonpath='{.status.nodeInfo.bootID}')
+kubectl run done --image=registry.k8s.io/e2e-test-images/agnhost:2.39 --restart=Never --command -- true
+until now=\$(kubectl get node worker -o jsonpath='{.status.nodeInfo.bootID}') && [[ -n \$now && \$now != "\$boot" ]]; do sleep 5; done
+kubectl wait --for=condition=Ready node/worker --timeout=5m
+kubectl run after --image=registry.k8s.io/e2e-test-images/agnhost:2.39 --restart=Never --command -- nslookup kubernetes.default.svc.cluster.local
+kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/after --timeout=5m
 finish OK
 GUEST
 
@@ -89,14 +96,14 @@ until curl -ksf https://$cp_ip:6443/healthz; do sleep 5; done
 if timeout 2m kubeadm join $cp_ip:6443 --token $token --discovery-token-ca-cert-hash sha256:$(printf '0%.0s' {1..64}) > /tmp/join 2>&1; then exit 1; fi
 cat /tmp/join; grep -i pinned /tmp/join
 kubeadm join $cp_ip:6443 --token $token --discovery-token-ca-cert-hash $hash
-until crictl ps -a --name '^dns\$' --state Exited -q | grep .; do sleep 5; done
+until crictl ps -a --name '^done\$' --state Exited -q | grep .; do sleep 5; done
 crictl images
 if crictl images | grep -E '/(kube-(apiserver|controller-manager|scheduler)|etcd) '; then exit 1; fi
 # containerd/containerd#14485; auditd takes the denials away from the kernel log
 if denied | grep -E '$([[ $CNI == cilium ]] && echo DENIED || echo operation=.signal)'; then exit 1; fi
 trap - EXIT
-# Stay up, the control plane is still using this node
 echo SMOKE_RESULT=OK
+reboot
 GUEST
 
 cleanup() {
@@ -124,7 +131,7 @@ boot() { # name, last byte of the MAC
   xorriso -as mkisofs -quiet -V config-2 -J -r -o "$dir/$1.iso" -graft-points "openstack=$cfg/openstack"
   sudo ip tuntap add "smoke-$1" mode tap user "$(id -un)"
   sudo ip link set "smoke-$1" master smoke up
-  timeout 25m qemu-system-x86_64 -M q35 -accel kvm -cpu host -smp 2 -m 4096 -display none -no-reboot -snapshot -uuid "$(uuidgen)" \
+  timeout 25m qemu-system-x86_64 -M q35 -accel kvm -cpu host -smp 2 -m 4096 -display none -snapshot -uuid "$(uuidgen)" \
     -serial "file:serial-$CNI-$1.log" \
     -drive "file=$disk,if=virtio,format=qcow2" \
     -drive "file=$dir/$1.iso,if=virtio,format=raw,readonly=on" \
@@ -141,7 +148,7 @@ cp=$!
 boot worker 11 &
 # The worker only exits first when it fails
 wait -n "$cp" $! || true
-# Its last checks may still be running
+# It prints its result before the control plane does, but the two logs race
 timeout 1m sh -c "until grep -q SMOKE_RESULT serial-$CNI-worker.log; do sleep 1; done" || true
 sleep 2
 kill "$tail"

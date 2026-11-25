@@ -27,7 +27,7 @@ ghcr.io/hayama17/capk-worker-node-images/ubuntu-2404-minimal:<kubernetes version
 - **No control plane images.** `kube-apiserver`, `kube-controller-manager`, `kube-scheduler` and `etcd` are never pulled during the build. Only `kube-proxy`, CoreDNS and `pause` are preloaded. Saved another 275 MB on v1.34.1.
 - **No build leftovers.** image-builder leaves the downloaded `.deb` files behind, including compilers. They were 205 MB on v1.37.2. snapd is removed too.
 
-CI fails if `kube-apiserver` or `etcd` ends up on the disk.
+CI fails if a control plane image ends up on a worker, or if the disk grows past a limit.
 
 The price:
 
@@ -60,7 +60,7 @@ A template that pins a retired build can no longer create machines, so move to a
 
 Nothing is pushed before it passes [`smoke.sh`](smoke.sh). It boots two machines from the disk the way CAPK does, with q35 and a virtio config drive. One runs a control plane of the same version, and the other joins it as a worker with `kubeadm join`, using a bootstrap token, an external endpoint and a pinned CA hash.
 
-That runs twice, with Flannel and with Cilium instead of kube-proxy. It checks CoreDNS, `kubectl logs` and `exec`, the guest agent, signals inside a container, that a wrong CA hash is refused, and that the worker pulled no control plane image.
+That runs twice, with Flannel and with Cilium instead of kube-proxy. It checks CoreDNS, `kubectl logs` and `exec`, the guest agent, signals inside a container, that a wrong CA hash is refused, that the worker pulled no control plane image, and that it works again after a reboot.
 
 With Cilium it also checks that a `NetworkPolicy` is enforced.
 
