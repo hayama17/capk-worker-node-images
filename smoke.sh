@@ -21,7 +21,8 @@ kubectl apply -f https://github.com/flannel-io/flannel/releases/download/v0.28.1
 kubectl taint nodes --all node-role.kubernetes.io/control-plane-
 kubectl wait --for=condition=Ready node --all --timeout=5m
 kubectl -n kube-system rollout status deploy/coredns --timeout=5m
-kubectl run dns --image=busybox:1.37 --restart=Never -- nslookup kubernetes.default.svc.cluster.local
+# Not Docker Hub, which rate-limits shared runners
+kubectl run dns --image=registry.k8s.io/e2e-test-images/agnhost:2.39 --restart=Never --command -- nslookup kubernetes.default.svc.cluster.local
 kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/dns --timeout=3m
 kubectl get nodes -o wide
 kubectl get pods -A -o wide
