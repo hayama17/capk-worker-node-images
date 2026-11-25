@@ -1,20 +1,55 @@
 #!/usr/bin/env bash
-# Boot the built disk the way CAPK does (q35, config drive on virtio) and bring up a one-node cluster on it.
+# Boot two machines from the built disk the way CAPK does (q35, config drive on virtio, DHCP),
+# run a control plane on one, and join the other to it as a worker.
 set -euo pipefail
 
-name=$OS-kube-$VERSION
+disk=image-builder/images/capi/output/$OS-kube-$VERSION/$OS-kube-$VERSION
 dir=$(mktemp -d)
-mkdir -p "$dir/openstack/latest"
-echo '{"uuid": "smoke", "hostname": "smoke"}' > "$dir/openstack/latest/meta_data.json"
-cat > "$dir/openstack/latest/user_data" <<GUEST
+net=192.168.77 cp_ip=192.168.77.10
+
+# The CA is made here, so that the worker can be given its hash before the control plane exists
+openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=kubernetes -addext keyUsage=critical,digitalSignature,keyEncipherment,keyCertSign \
+  -keyout "$dir/ca.key" -out "$dir/ca.crt" 2>/dev/null
+hash=sha256:$(openssl x509 -in "$dir/ca.crt" -noout -pubkey | openssl pkey -pubin -outform der | sha256sum | cut -d' ' -f1)
+token=$(openssl rand -hex 3).$(openssl rand -hex 8)
+
+prologue() {
+  cat <<GUEST
 #!/bin/bash
 # A getty that starts later hangs up the port and kills this script
 systemctl mask --runtime --now serial-getty@ttyS0
 exec > /dev/ttyS0 2>&1
 set -e
 finish() { trap - EXIT; echo "SMOKE_RESULT=\$1"; sleep 2; poweroff -f; }
-trap 'set +e; systemctl --failed --no-pager; journalctl -u kubelet -u containerd --no-pager | tail -60; kubectl get pods -A -o wide; kubectl logs dns; kubectl -n kube-system logs ds/kube-proxy --tail=40; kubectl -n kube-system logs deploy/coredns --tail=40; { journalctl -k --no-pager; cat /var/log/audit/audit.log; } | grep DENIED | tail -20; finish NG' EXIT
+denied() { { journalctl -k --no-pager; cat /var/log/audit/audit.log; } | grep DENIED; }
+trap 'set +e; systemctl --failed --no-pager; journalctl -u kubelet -u containerd --no-pager | tail -60; crictl ps -a; kubectl get nodes,pods -A -o wide; kubectl logs dns; kubectl -n kube-system logs ds/kube-proxy --tail=40; kubectl -n kube-system logs deploy/coredns --tail=40; denied | tail -20; finish NG' EXIT
+GUEST
+}
+
+{ prologue; cat <<GUEST; } > "$dir/cp"
 export KUBECONFIG=/etc/kubernetes/admin.conf
+mkdir -p /etc/kubernetes/pki
+base64 -d <<< "$(base64 -w0 "$dir/ca.crt")" > /etc/kubernetes/pki/ca.crt
+base64 -d <<< "$(base64 -w0 "$dir/ca.key")" > /etc/kubernetes/pki/ca.key
+kubeadm init --kubernetes-version $VERSION --pod-network-cidr 10.244.0.0/16 --token $token
+kubectl apply -f https://github.com/flannel-io/flannel/releases/download/v0.28.11/kube-flannel.yml
+until kubectl get node worker; do sleep 5; done
+kubectl wait --for=condition=Ready node --all --timeout=5m
+kubectl -n kube-system rollout status deploy/coredns --timeout=5m
+# The worker is the only node without a taint. Not Docker Hub, which rate-limits shared runners
+kubectl run dns --image=registry.k8s.io/e2e-test-images/agnhost:2.39 --restart=Never --command -- sh -c 'sleep 60 & kill \$! && nslookup kubernetes.default.svc.cluster.local'
+kubectl run exec --image=registry.k8s.io/e2e-test-images/agnhost:2.39 --restart=Never -- pause
+kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/dns --timeout=3m
+kubectl logs dns | grep -F kubernetes.default
+kubectl wait --for=condition=Ready pod/exec --timeout=3m
+[[ \$(kubectl get pod exec -o jsonpath='{.spec.nodeName}') == worker ]]
+kubectl exec exec -- cat /etc/hostname | grep -x exec
+kubectl get nodes,pods -A -o wide
+finish OK
+GUEST
+
+{ prologue; cat <<GUEST; } > "$dir/worker"
+uname -r
 systemctl is-active qemu-guest-agent
 # Nothing from the build may let anyone log in
 if getent passwd builder; then exit 1; fi
@@ -23,32 +58,60 @@ mkdir -p /run/sshd
 sshd -T | grep -x 'passwordauthentication no'
 if ls -d /usr/lib/snapd /usr/lib/linux-tools-*; then exit 1; fi
 containerd --version; runc --version; crictl --version; /opt/cni/bin/bridge --version
+until curl -ksf https://$cp_ip:6443/healthz; do sleep 5; done
+# A control plane with another CA must be refused, and for that reason
+if timeout 2m kubeadm join $cp_ip:6443 --token $token --discovery-token-ca-cert-hash sha256:$(printf '0%.0s' {1..64}) > /tmp/join 2>&1; then exit 1; fi
+cat /tmp/join; grep -i pinned /tmp/join
+kubeadm join $cp_ip:6443 --token $token --discovery-token-ca-cert-hash $hash
+until crictl ps -a --name '^dns\$' --state Exited -q | grep .; do sleep 5; done
 crictl images
-if crictl images | grep -E '/(kube-apiserver|etcd) '; then exit 1; fi
-kubeadm init --kubernetes-version $VERSION --pod-network-cidr 10.244.0.0/16
-kubectl apply -f https://github.com/flannel-io/flannel/releases/download/v0.28.11/kube-flannel.yml
-kubectl taint nodes --all node-role.kubernetes.io/control-plane-
-kubectl wait --for=condition=Ready node --all --timeout=5m
-kubectl -n kube-system rollout status deploy/coredns --timeout=5m
-# Not Docker Hub, which rate-limits shared runners
-kubectl run dns --image=registry.k8s.io/e2e-test-images/agnhost:2.39 --restart=Never --command -- sh -c 'sleep 60 & kill \$! && nslookup kubernetes.default.svc.cluster.local'
-kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/dns --timeout=3m
-kubectl logs dns
+if crictl images | grep -E '/(kube-(apiserver|controller-manager|scheduler)|etcd) '; then exit 1; fi
 # containerd/containerd#14485; auditd takes the denials away from the kernel log
-if { journalctl -k --no-pager; cat /var/log/audit/audit.log; } | grep -E 'DENIED.*operation=.signal'; then exit 1; fi
-kubectl get nodes -o wide
-finish OK
+if denied | grep -E 'operation=.signal'; then exit 1; fi
+trap - EXIT
+# Stay up, the control plane is still using this node
+echo SMOKE_RESULT=OK
 GUEST
-xorriso -as mkisofs -quiet -V config-2 -J -r -o "$dir/config.iso" -graft-points "openstack=$dir/openstack"
 
-touch serial.log
-tail -f serial.log &
-timeout 25m qemu-system-x86_64 -M q35 -accel kvm -cpu host -smp 2 -m 4096 -display none -no-reboot -snapshot \
-  -serial file:serial.log \
-  -drive "file=image-builder/images/capi/output/$name/$name,if=virtio,format=qcow2" \
-  -drive "file=$dir/config.iso,if=virtio,format=raw,readonly=on" \
-  -device pcie-root-port,id=rp1,slot=1 -netdev user,id=n0 -device virtio-net-pci,bus=rp1,netdev=n0 \
-  -device virtio-serial -chardev null,id=ga -device virtserialport,chardev=ga,name=org.qemu.guest_agent.0 || true
-kill %1
+sudo apt-get install -y -q dnsmasq-base
+sudo ip link add smoke type bridge
+sudo ip addr add "$net.1/24" dev smoke
+sudo ip link set smoke up
+sudo sysctl -qw net.ipv4.ip_forward=1
+sudo iptables -t nat -A POSTROUTING -s "$net.0/24" ! -o smoke -j MASQUERADE
+sudo iptables -I FORWARD -i smoke -j ACCEPT
+sudo iptables -I FORWARD -o smoke -j ACCEPT
+sudo dnsmasq --interface=smoke --bind-interfaces --except-interface=lo --dhcp-range="$net.10,$net.20" \
+  --dhcp-host="52:54:00:00:00:10,$cp_ip" --dhcp-host="52:54:00:00:00:11,$net.11" --pid-file="$dir/dnsmasq.pid"
 
-grep -q 'SMOKE_RESULT=OK' serial.log
+boot() { # name, last byte of the MAC
+  local cfg=$dir/$1-config
+  mkdir -p "$cfg/openstack/latest"
+  echo "{\"uuid\": \"smoke-$1\", \"hostname\": \"$1\"}" > "$cfg/openstack/latest/meta_data.json"
+  cp "$dir/$1" "$cfg/openstack/latest/user_data"
+  xorriso -as mkisofs -quiet -V config-2 -J -r -o "$dir/$1.iso" -graft-points "openstack=$cfg/openstack"
+  sudo ip tuntap add "smoke-$1" mode tap user "$(id -un)"
+  sudo ip link set "smoke-$1" master smoke up
+  timeout 25m qemu-system-x86_64 -M q35 -accel kvm -cpu host -smp 2 -m 4096 -display none -no-reboot -snapshot -uuid "$(uuidgen)" \
+    -serial "file:serial-$1.log" \
+    -drive "file=$disk,if=virtio,format=qcow2" \
+    -drive "file=$dir/$1.iso,if=virtio,format=raw,readonly=on" \
+    -device pcie-root-port,id=rp1,slot=1 -netdev "tap,id=n0,ifname=smoke-$1,script=no,downscript=no" \
+    -device "virtio-net-pci,bus=rp1,netdev=n0,mac=52:54:00:00:00:$2" \
+    -device virtio-serial -chardev null,id=ga -device virtserialport,chardev=ga,name=org.qemu.guest_agent.0
+}
+
+touch serial-cp.log serial-worker.log
+tail -f serial-cp.log serial-worker.log &
+tail=$!
+boot cp 10 &
+cp=$!
+boot worker 11 &
+# The worker only exits first when it fails
+wait -n "$cp" $! || true
+sleep 2
+kill "$tail"
+sudo pkill qemu-system || true
+
+grep -q 'SMOKE_RESULT=OK' serial-cp.log
+grep -q 'SMOKE_RESULT=OK' serial-worker.log

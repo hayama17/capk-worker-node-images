@@ -58,9 +58,11 @@ A template that pins a retired build can no longer create machines, so move to a
 
 ## What is tested
 
-Nothing is pushed before it passes [`smoke.sh`](smoke.sh). It boots the disk the way CAPK does, with q35 and a virtio config drive. The script then checks kubeadm, Flannel, CoreDNS, the guest agent, and signals inside a container.
+Nothing is pushed before it passes [`smoke.sh`](smoke.sh). It boots two machines from the disk the way CAPK does, with q35, a virtio config drive and DHCP. One runs a control plane of the same version, and the other joins it as a worker with `kubeadm join`, using a bootstrap token, an external endpoint and a pinned CA hash.
 
-It runs `kubeadm init`, which is not how workers start. `kubeadm join` against an external API server is not tested yet ([#8](https://github.com/hayama17/capk-worker-node-images/issues/8)), and neither are Kamaji, CAPK, Cilium and storage drivers.
+It then checks Flannel, CoreDNS across nodes, `kubectl logs` and `exec`, the guest agent, signals inside a container, that a wrong CA hash is refused, and that the worker pulled no control plane image.
+
+It does not run Kamaji, CAPK, Cilium or storage drivers.
 
 ## Retention
 
