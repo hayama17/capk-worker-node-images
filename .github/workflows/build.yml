@@ -1,6 +1,9 @@
 name: build
 # No inputs: provenance does not record them, so the commit alone has to determine the build
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * 1"
 permissions: {}
 concurrency: build-${{ github.ref }}
 jobs:
@@ -39,18 +42,17 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
         run: ./release.sh
-  # Lists only. Deleting takes --delete and packages: write
   retire:
     if: github.ref == 'refs/heads/main'
     needs: release
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-      packages: read
+      packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - env:
           GH_TOKEN: ${{ github.token }}
-        run: ./retire.py ubuntu-2404-minimal
+        run: ./retire.py ubuntu-2404-minimal --delete
