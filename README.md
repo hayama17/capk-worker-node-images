@@ -9,7 +9,7 @@ With a hosted control plane, the API server and etcd run outside the cluster's o
 | | Kubernetes | Pull (compressed) | Disk |
 |---|---|---:|---:|
 | `quay.io/capk/ubuntu-2404-container-disk` | v1.34.1 | 2,167 MB | 4.38 GB |
-| **This repository** | v1.37.2 | **673 MB** | **1.76 GB** |
+| **This repository** | v1.37.2 | **664 MB** | **1.74 GB** |
 
 Measured in November 2026. The versions differ because v1.34.1 was the newest one CAPK had published.
 
@@ -53,8 +53,10 @@ A template that pins a retired build can no longer create machines, so move to a
 
 - Ubuntu 24.04, amd64
 - kubelet, kubeadm and kubectl of the tagged version
-- containerd
+- containerd, runc, crictl and the CNI plugins
 - `qemu-guest-agent`
+
+Each [release](https://github.com/hayama17/capk-worker-node-images/releases) lists their versions. They are pinned with checksums in [`versions.env`](versions.env) and updated by Renovate.
 
 ## What is tested
 
@@ -72,15 +74,15 @@ The registry holds the images that can be used now. The [releases](https://githu
 
 | State | Which | Kept builds |
 |---|---|---|
-| Active | Listed in [`build.yml`](.github/workflows/build.yml) | 3 |
-| Archived | Replaced by a newer patch | 1, so existing clusters can still add workers |
+| Active | Newest patch of each minor that upstream still supports, listed in [`build.yml`](.github/workflows/build.yml) | 3 |
+| Archived | Replaced by a newer patch. Not rebuilt | 1, so existing clusters can still add workers |
 | End of life | Minor out of upstream support | Removed by hand, after an announcement |
 
 Every Monday the images are rebuilt, and builds past these limits are removed. Provenance and SBOM are kept as long as their image. **A pinned build tag or digest stops resolving once that build is retired**, so mirror it if you need it for longer.
 
 ## Build your own
 
-Fork the repository, enable Actions, list the versions you want in [`build.yml`](.github/workflows/build.yml), and run it. It publishes to the GHCR of the fork from `main`, and only builds and tests from other branches.
+Fork the repository, enable Actions, list the versions you want in [`build.yml`](.github/workflows/build.yml), and run it. It publishes to the GHCR of the fork from `main`, and only builds and tests from other branches. On `main` it also rebuilds every Monday and removes old builds.
 
 ```bash
 gh workflow run build.yml -R <you>/capk-worker-node-images
