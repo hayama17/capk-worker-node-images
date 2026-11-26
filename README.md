@@ -76,7 +76,7 @@ The registry holds the images that can be used now. The [releases](https://githu
 | Archived | Replaced by a newer patch | 1, so existing clusters can still add workers |
 | End of life | Minor out of upstream support | Removed by hand, after an announcement |
 
-Provenance and SBOM are kept as long as their image. **A pinned build tag or digest stops resolving once that build is retired**, so mirror it if you need it for longer.
+Every Monday the images are rebuilt, and builds past these limits are removed. Provenance and SBOM are kept as long as their image. **A pinned build tag or digest stops resolving once that build is retired**, so mirror it if you need it for longer.
 
 ## Build your own
 
